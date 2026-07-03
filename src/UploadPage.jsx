@@ -60,6 +60,7 @@ function LoginBox() {
 
   return (
     <form onSubmit={handleLogin}>
+      <a href="/" style={styles.backLink}>← Back to report</a>
       <div style={styles.eyebrow}>WhatsApp Funnel Pipeline</div>
       <h1 style={styles.title}>Log in to upload</h1>
       <p style={styles.subtitle}>Use the email and password set up in Supabase Authentication.</p>
@@ -132,6 +133,7 @@ function UploadBox({ onLogout }) {
 
   return (
     <div>
+      <a href="/" style={styles.backLink}>← Back to report</a>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={styles.eyebrow}>WhatsApp Funnel Pipeline</div>
@@ -182,6 +184,14 @@ const styles = {
     borderRadius: 12,
     padding: 32,
     boxShadow: '0 1px 2px rgba(20,25,40,0.04)',
+  },
+  backLink: {
+    display: 'inline-block',
+    marginBottom: 16,
+    fontFamily: "'IBM Plex Mono', monospace",
+    fontSize: 11,
+    color: '#5c6479',
+    textDecoration: 'none',
   },
   eyebrow: {
     fontFamily: "'IBM Plex Mono', monospace",

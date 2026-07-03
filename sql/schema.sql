@@ -30,6 +30,16 @@ create table if not exists whatsapp_funnel_summary (
 create index if not exists idx_whatsapp_funnel_summary_date
   on whatsapp_funnel_summary (report_date);
 
+-- Lock this table down: only logged-in users (the report's password
+-- gate) can read it. The processing function uses the service_role
+-- key, which bypasses RLS entirely, so it can keep upserting either way.
+alter table whatsapp_funnel_summary enable row level security;
+
+create policy "authenticated users can view funnel summary"
+  on whatsapp_funnel_summary for select
+  to authenticated
+  using (true);
+
 -- 2. Observability — every processing run gets logged here so a
 --    silent failure is never actually silent. Check this table (or
 --    build a tiny status widget) to see when the pipeline last ran.
@@ -48,9 +58,15 @@ create table if not exists daily_upload_log (
 --    Private — only the service role (used by the processing
 --    function) and authenticated users (via the upload page) can
 --    touch it.
-insert into storage.buckets (id, name, public)
-values ('daily-exports', 'daily-exports', false)
-on conflict (id) do nothing;
+-- file_size_limit is in bytes. 100 MB gives headroom above the ~80 MB
+-- daily files. Note: this only takes effect if it's <= the project-wide
+-- global upload limit (Project Settings > Storage) — free-tier projects
+-- are hard-capped at 50 MB there regardless of this setting, so files
+-- over 50 MB will still be rejected until the project is on a paid plan
+-- with that global limit raised to at least 100 MB.
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('daily-exports', 'daily-exports', false, 104857600)
+on conflict (id) do update set file_size_limit = excluded.file_size_limit;
 
 -- Only logged-in users can upload to this bucket. Pair this with
 -- Supabase Auth (email/password or magic link) on the upload page
@@ -64,6 +80,15 @@ create policy "authenticated users can view daily exports"
   on storage.objects for select
   to authenticated
   using (bucket_id = 'daily-exports');
+
+-- Re-uploading the same day's file (upsert:true in UploadPage.jsx)
+-- overwrites the existing storage object, which is an UPDATE, not an
+-- INSERT — without this policy that overwrite is blocked by RLS.
+create policy "authenticated users can overwrite daily exports"
+  on storage.objects for update
+  to authenticated
+  using (bucket_id = 'daily-exports')
+  with check (bucket_id = 'daily-exports');
 
 -- ============================================================
 -- Option A (recommended): create the webhook in the Dashboard UI

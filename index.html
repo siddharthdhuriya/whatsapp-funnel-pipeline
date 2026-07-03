@@ -1,17 +1,391 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WhatsApp Funnel — Upload</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body style="margin:0">
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<title>WhatsApp Funnel Control Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ffffff;
+    --surface:#ffffff;
+    --surface-alt:#f4f6fa;
+    --surface-sunk:#eef1f7;
+    --border:#e1e6ef;
+    --border-soft:#edf0f6;
+    --text:#151b2c;
+    --text-dim:#5c6479;
+    --text-faint:#9399ac;
+    --teal:#0d9488;
+    --teal-dim: rgba(13,148,136,0.10);
+    --amber:#c2760a;
+    --amber-dim: rgba(194,118,10,0.10);
+    --violet:#6d5bd0;
+    --violet-dim: rgba(109,91,208,0.10);
+    --red:#d6293e;
+    --red-dim: rgba(214,41,62,0.10);
+    --font-display:'Space Grotesk', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(13,148,136,0.05), transparent 40%),
+      radial-gradient(circle at 88% 10%, rgba(109,91,208,0.05), transparent 45%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-display);
+    padding: 28px 32px 60px;
+    min-height:100vh;
+  }
+  .wrap{max-width:1320px; margin:0 auto;}
+  .hidden{display:none !important;}
+
+  /* AUTH GATE */
+  .auth-gate{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;}
+  .auth-card{
+    width:100%; max-width:420px;
+    border:1px solid var(--border); border-radius:12px; padding:32px;
+    box-shadow: 0 1px 2px rgba(20,25,40,0.04);
+  }
+  .auth-card h1{font-size:22px; font-weight:600; margin:0 0 8px; color:var(--text);}
+  .auth-sub{font-size:13px; color:var(--text-dim); margin-bottom:24px; line-height:1.5;}
+  .auth-card input{
+    width:100%; box-sizing:border-box; padding:10px 12px; margin-bottom:12px;
+    border:1px solid var(--border); border-radius:8px; font-size:13px;
+    font-family:var(--font-mono);
+  }
+  .auth-card button{
+    width:100%; padding:10px 12px; border:none; border-radius:8px;
+    background:var(--teal); color:#fff; font-size:13px; font-weight:600;
+    cursor:pointer; font-family:var(--font-display);
+  }
+  .auth-card button:disabled{opacity:.6; cursor:default;}
+  .auth-error{
+    margin-top:16px; padding:10px 14px; border-radius:8px; font-size:12.5px;
+    font-family:var(--font-mono); background:var(--red-dim); color:var(--red);
+  }
+
+  /* HEADER */
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    flex-wrap:wrap; gap:16px;
+    padding-bottom:20px; margin-bottom:22px;
+    border-bottom:1px solid var(--border);
+  }
+  .title-block .eyebrow{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.18em;
+    color:var(--teal); text-transform:uppercase; margin-bottom:6px;
+  }
+  h1{margin:0; font-size:26px; font-weight:600; letter-spacing:-0.01em; color:var(--text);}
+  .subtitle{color:var(--text-dim); font-size:13px; margin-top:5px;}
+  .header-right{display:flex; flex-direction:column; align-items:flex-end; gap:10px;}
+  .live-stamp{
+    font-family:var(--font-mono); font-size:11px; color:var(--text-faint);
+    display:flex; align-items:center; gap:8px;
+  }
+  .pulse{width:7px; height:7px; border-radius:50%; background:var(--teal); box-shadow:0 0 0 0 rgba(13,148,136,.5); animation:pulse 2s infinite;}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(13,148,136,.4);}
+    70%{box-shadow:0 0 0 7px rgba(13,148,136,0);}
+    100%{box-shadow:0 0 0 0 rgba(13,148,136,0);}
+  }
+  .header-actions{display:flex; gap:8px;}
+  .corner-btn{
+    font-family:var(--font-mono); font-size:11px; padding:7px 12px;
+    border:1px solid var(--border); border-radius:8px; background:#fff;
+    color:var(--text-dim); cursor:pointer; text-decoration:none;
+    transition:all .15s ease; white-space:nowrap;
+  }
+  .corner-btn:hover{border-color:var(--teal); color:var(--teal);}
+
+  /* FILTER BAR */
+  .filterbar{
+    display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;
+    background:var(--surface-alt); border:1px solid var(--border);
+    border-radius:10px; padding:16px 18px; margin-bottom:26px;
+  }
+  .filter-group{display:flex; flex-direction:column; gap:8px;}
+  .filter-label{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--text-faint);
+  }
+  .pill-row{display:flex; gap:6px; flex-wrap:wrap;}
+  .pill{
+    font-family:var(--font-mono); font-size:12px; padding:6px 12px;
+    border-radius:999px; border:1px solid var(--border);
+    background:#ffffff; color:var(--text-dim);
+    cursor:pointer; user-select:none; transition:all .15s ease;
+    white-space:nowrap;
+  }
+  .pill:hover{border-color:var(--teal); color:var(--text);}
+  .pill.active{
+    background:var(--teal-dim); border-color:var(--teal); color:var(--teal);
+  }
+  .filter-spacer{flex:1;}
+  .reset-btn{
+    align-self:flex-end;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.06em;
+    color:var(--text-dim); background:#ffffff; border:1px solid var(--border);
+    border-radius:8px; padding:8px 14px; cursor:pointer; transition:all .15s ease;
+  }
+  .reset-btn:hover{color:var(--red); border-color:var(--red);}
+  .result-count{
+    font-family:var(--font-mono); font-size:11px; color:var(--text-faint); align-self:flex-end;
+    padding-bottom:9px;
+  }
+
+  /* DATE SELECTOR */
+  .date-inputs{display:flex; align-items:center; gap:8px;}
+  .date-inputs input[type=date]{
+    font-family:var(--font-mono); font-size:12px; color:var(--text);
+    background:#ffffff; border:1px solid var(--border); border-radius:7px;
+    padding:6px 9px; outline:none;
+  }
+  .date-inputs input[type=date]:focus{border-color:var(--teal);}
+  .date-inputs .to{font-family:var(--font-mono); font-size:11px; color:var(--text-faint);}
+  .date-quick{display:flex; gap:6px; margin-top:2px;}
+
+  /* FUNNEL / KPI STRIP */
+  .funnel{
+    display:grid; grid-template-columns: repeat(6, 1fr);
+    gap:14px; margin-bottom:28px;
+  }
+  .kpi{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:16px 16px 14px; position:relative; overflow:hidden;
+    box-shadow: 0 1px 2px rgba(20,25,40,0.04);
+  }
+  .kpi::before{
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background:var(--kcolor, var(--teal));
+  }
+  .kpi .klabel{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--text-faint); margin-bottom:10px;
+  }
+  .kpi .kvalue{
+    font-family:var(--font-mono); font-size:28px; font-weight:600;
+    color:var(--text); line-height:1;
+  }
+  .kpi .ksub{
+    font-family:var(--font-mono); font-size:12px; color:var(--kcolor, var(--teal));
+    margin-top:8px; display:flex; align-items:center; gap:6px;
+  }
+  .kpi .kbar{
+    margin-top:12px; height:4px; border-radius:2px; background:var(--surface-sunk); overflow:hidden;
+  }
+  .kpi .kbar-fill{height:100%; background:var(--kcolor, var(--teal)); border-radius:2px; transition:width .4s ease;}
+
+  /* MAIN GRID: table + side panel */
+  .maingrid{display:grid; grid-template-columns: 1.6fr 1fr; gap:20px;}
+  @media (max-width: 980px){ .maingrid{grid-template-columns:1fr;} .funnel{grid-template-columns:repeat(3,1fr);} }
+
+  .panel{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:18px 18px 8px; overflow:hidden;
+    box-shadow: 0 1px 2px rgba(20,25,40,0.04);
+  }
+  .panel h2{
+    font-size:14px; margin:0 0 3px; font-weight:600; display:flex; align-items:center; gap:8px; color:var(--text);
+  }
+  .panel h2 .tag{
+    font-family:var(--font-mono); font-size:10px; padding:2px 7px; border-radius:5px;
+    background:var(--surface-alt); color:var(--text-faint); border:1px solid var(--border);
+  }
+  .panel .desc{font-size:12px; color:var(--text-faint); margin-bottom:14px;}
+
+  table{width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:12.5px;}
+  thead th{
+    text-align:right; padding:8px 10px; color:var(--text-faint); font-weight:500;
+    font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+    border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface);
+  }
+  thead th:first-child, tbody td:first-child{text-align:left; min-width:200px;}
+  tbody td{padding:9px 10px; text-align:right; border-bottom:1px solid var(--border-soft); color:var(--text);}
+  tbody tr:hover{background:var(--surface-alt);}
+  tbody tr.overall-row{background:var(--surface-alt); font-weight:600;}
+  tbody tr.overall-row td{border-bottom:1px solid var(--teal); color:var(--teal);}
+  .pct{color:var(--text-dim); font-size:11px;}
+  .pct.low{color:var(--red); font-weight:700; background:var(--red-dim); border-radius:5px; padding:2px 6px;}
+  .table-scroll{max-height:520px; overflow-y:auto; margin:0 -18px; padding:0 18px;}
+  th.sortable{cursor:pointer;}
+  th.sortable:hover{color:var(--teal);}
+  th .arrow{font-size:9px; margin-left:2px; opacity:.6;}
+
+  /* Funnel bars viz */
+  .stagebar{margin-bottom:18px;}
+  .stagebar .srow{display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:11.5px; margin-bottom:6px;}
+  .stagebar .sname{color:var(--text-dim);}
+  .stagebar .sval{color:var(--text); font-weight:600;}
+  .stagebar .strack{height:26px; border-radius:6px; background:var(--surface-sunk); border:1px solid var(--border-soft); overflow:hidden;}
+  .stagebar .sfill{height:100%; border-radius:6px 0 0 6px; transition:width .5s ease; display:flex; align-items:center; padding-left:8px;}
+  .sfill.f1{background:linear-gradient(90deg, #0d9488, #0b7d73);}
+  .sfill.f2{background:linear-gradient(90deg, #6d5bd0, #5949b8);}
+  .sfill.f3{background:linear-gradient(90deg, #c2760a, #a5620a);}
+
+  .miniheader{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--text-faint); margin: 22px 0 10px;
+  }
+  .split-row{display:flex; gap:10px;}
+  .split-card{
+    flex:1; background:var(--surface-alt); border:1px solid var(--border-soft);
+    border-radius:8px; padding:12px; text-align:center;
+  }
+  .split-card .sc-label{font-family:var(--font-mono); font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.06em;}
+  .split-card .sc-val{font-family:var(--font-mono); font-size:20px; font-weight:600; margin-top:6px;}
+  .split-card .sc-pct{font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin-top:2px;}
+
+  footer{margin-top:24px; text-align:center; font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="authGate" class="auth-gate">
+    <div class="auth-card">
+      <div class="eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.18em; color:var(--teal); text-transform:uppercase; margin-bottom:6px;">WhatsApp Funnel Pipeline</div>
+      <h1>Log in to view the report</h1>
+      <p class="auth-sub">Use the email and password set up in Supabase Authentication.</p>
+      <form id="loginForm">
+        <input type="email" id="loginEmail" placeholder="Email" required>
+        <input type="password" id="loginPassword" placeholder="Password" required>
+        <button type="submit" id="loginBtn">Log in</button>
+      </form>
+      <div id="loginError" class="auth-error hidden"></div>
+    </div>
+  </div>
+
+  <div id="dashboard" class="hidden">
+
+    <header>
+      <div class="title-block">
+        <div class="eyebrow">Justdial · Lead Qualification Funnel</div>
+        <h1>WhatsApp Funnel Control Room</h1>
+        <div class="subtitle" id="recordSubtitle">Loading dataset…</div>
+      </div>
+      <div class="header-right">
+        <div class="live-stamp"><span class="pulse"></span> LIVE · <span id="totalRowsStamp">–</span> leads loaded</div>
+        <div class="header-actions">
+          <a href="/upload.html" class="corner-btn">⇪ Upload data</a>
+          <button id="refreshBtn" class="corner-btn">⟳ Refresh</button>
+          <button id="logoutBtn" class="corner-btn">Log out</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="filterbar">
+      <div class="filter-group">
+        <div class="filter-label">Date Range</div>
+        <div class="date-inputs">
+          <input type="date" id="dateFrom">
+          <span class="to">to</span>
+          <input type="date" id="dateTo">
+        </div>
+        <div class="date-quick">
+          <div class="pill" id="qAll">All dates</div>
+          <div class="pill" id="qLast3">Last 3 days</div>
+          <div class="pill" id="qYesterday">Yesterday</div>
+        </div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">Medium</div>
+        <div class="pill-row" id="mediumPills"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">Call Status</div>
+        <div class="pill-row" id="callStatusPills"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">BD</div>
+        <div class="pill-row" id="bdPills"></div>
+      </div>
+      <div class="filter-spacer"></div>
+      <div class="result-count" id="resultCount"></div>
+      <button class="reset-btn" id="resetBtn">✕ Reset filters</button>
+    </div>
+
+    <div class="funnel" id="kpiStrip"></div>
+
+    <div class="maingrid">
+      <div class="panel">
+        <h2>Channel Breakdown <span class="tag" id="channelCount">–</span></h2>
+        <div class="desc">Sent, delivered and converted counts per channel for the current filter selection. Overall totals pinned on top. Converted % below 10% is flagged in red.</div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th class="sortable" data-key="channel">Channel <span class="arrow">▾</span></th>
+                <th class="sortable" data-key="bd">BD <span class="arrow"></span></th>
+                <th class="sortable" data-key="total">Leads <span class="arrow"></span></th>
+                <th class="sortable" data-key="sent">Sent <span class="arrow"></span></th>
+                <th class="sortable" data-key="delivered">Delivered <span class="arrow"></span></th>
+                <th>Delivered %</th>
+                <th class="sortable" data-key="converted">Converted <span class="arrow"></span></th>
+                <th class="sortable" data-key="convPct">Converted % <span class="arrow"></span></th>
+              </tr>
+            </thead>
+            <tbody id="channelTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Funnel Shape</h2>
+        <div class="desc">Sent → Delivered → Converted, scaled to Sent = 100%.</div>
+        <div class="stagebar">
+          <div class="srow"><span class="sname">WhatsApp Sent</span><span class="sval" id="fSentVal">–</span></div>
+          <div class="strack"><div class="sfill f1" id="fSentBar" style="width:0%"></div></div>
+        </div>
+        <div class="stagebar">
+          <div class="srow"><span class="sname">Delivered</span><span class="sval" id="fDelVal">–</span></div>
+          <div class="strack"><div class="sfill f2" id="fDelBar" style="width:0%"></div></div>
+        </div>
+        <div class="stagebar">
+          <div class="srow"><span class="sname">Converted</span><span class="sval" id="fConvVal">–</span></div>
+          <div class="strack"><div class="sfill f3" id="fConvBar" style="width:0%"></div></div>
+        </div>
+
+        <div class="miniheader">Enrichment status</div>
+        <div class="split-row">
+          <div class="split-card">
+            <div class="sc-label">Enriched</div>
+            <div class="sc-val" id="enrichedVal" style="color:var(--violet)">–</div>
+            <div class="sc-pct" id="enrichedPct">–</div>
+          </div>
+          <div class="split-card">
+            <div class="sc-label">Approved</div>
+            <div class="sc-val" id="approvedVal" style="color:var(--amber)">–</div>
+            <div class="sc-pct" id="approvedPct">–</div>
+          </div>
+        </div>
+
+        <div class="miniheader">Cost</div>
+        <div class="split-row">
+          <div class="split-card">
+            <div class="sc-label">Total Cost</div>
+            <div class="sc-val" id="totalCostVal" style="color:var(--teal)">–</div>
+            <div class="sc-pct" id="totalCostSub">–</div>
+          </div>
+        </div>
+        <div class="split-row" style="margin-top:10px;">
+          <div class="split-card">
+            <div class="sc-label">Cost / Converted Lead</div>
+            <div class="sc-val" id="costPerConvVal" style="color:var(--amber)">–</div>
+          </div>
+          <div class="split-card">
+            <div class="sc-label">Cost / Enriched Lead</div>
+            <div class="sc-val" id="costPerEnrichVal" style="color:var(--violet)">–</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>Metrics derived from daily uploads · WhatsApp Sent / Delivered / Converted on WhatsApp = "Yes" · Enriched = 1st Ans Date present · Approved = all 3 Ans Dates present · Date filter based on Date Created</footer>
+  </div>
+</div>
+<script type="module" src="/src/report-main.js"></script>
+</body>
 </html>
