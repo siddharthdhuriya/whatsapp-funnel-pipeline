@@ -1,16 +1,21 @@
 // src/report-main.js
 //
 // Drives index.html — the WhatsApp Funnel Control Room report.
-// Gated behind Supabase Auth (same login used on the upload page),
-// then fetches live segment rows from whatsapp_funnel_summary and
-// renders them exactly like the original static dashboard did.
-
+// Gated behind a single shared password (not a per-user login) — the
+// password field signs in to one fixed internal Supabase Auth account
+// behind the scenes so the existing RLS policies (which require an
+// `authenticated` session) keep protecting the data without needing a
+// full multi-user login system.
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
+
+// Fixed account behind the shared password gate — not a real mailbox,
+// just an identity for Supabase Auth/RLS to attach the session to.
+const SHARED_EMAIL = 'access@whatsapp-funnel.internal';
 
 const authGate = document.getElementById('authGate');
 const dashboard = document.getElementById('dashboard');
@@ -48,9 +53,8 @@ loginForm.addEventListener('submit', async (e) => {
   loginBtn.disabled = true;
   loginBtn.textContent = 'Logging in…';
 
-  const email = document.getElementById('loginEmail').value;
   const password = document.getElementById('loginPassword').value;
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabase.auth.signInWithPassword({ email: SHARED_EMAIL, password });
 
   loginBtn.disabled = false;
   loginBtn.textContent = 'Log in';

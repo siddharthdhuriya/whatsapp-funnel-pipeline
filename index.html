@@ -247,12 +247,11 @@
   <div id="authGate" class="auth-gate">
     <div class="auth-card">
       <div class="eyebrow" style="font-family:var(--font-mono); font-size:11px; letter-spacing:.18em; color:var(--teal); text-transform:uppercase; margin-bottom:6px;">WhatsApp Funnel Pipeline</div>
-      <h1>Log in to view the report</h1>
-      <p class="auth-sub">Use the email and password set up in Supabase Authentication.</p>
+      <h1>Enter password to view the report</h1>
+      <p class="auth-sub">This report is password-protected.</p>
       <form id="loginForm">
-        <input type="email" id="loginEmail" placeholder="Email" required>
-        <input type="password" id="loginPassword" placeholder="Password" required>
-        <button type="submit" id="loginBtn">Log in</button>
+        <input type="password" id="loginPassword" placeholder="Password" required autofocus>
+        <button type="submit" id="loginBtn">Unlock</button>
       </form>
       <div id="loginError" class="auth-error hidden"></div>
     </div>

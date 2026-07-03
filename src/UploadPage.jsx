@@ -15,6 +15,10 @@ const supabase = createClient(
 
 const BUCKET = 'daily-exports';
 
+// Fixed account behind the shared password gate — not a real mailbox,
+// just an identity for Supabase Auth/RLS to attach the session to.
+const SHARED_EMAIL = 'access@whatsapp-funnel.internal';
+
 export default function UploadPage() {
   const [session, setSession] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -44,7 +48,6 @@ export default function UploadPage() {
 }
 
 function LoginBox() {
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,7 +56,7 @@ function LoginBox() {
     e.preventDefault();
     setLoading(true);
     setError('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: SHARED_EMAIL, password });
     if (error) setError(error.message);
     setLoading(false);
   };
@@ -62,27 +65,20 @@ function LoginBox() {
     <form onSubmit={handleLogin}>
       <a href="/" style={styles.backLink}>← Back to report</a>
       <div style={styles.eyebrow}>WhatsApp Funnel Pipeline</div>
-      <h1 style={styles.title}>Log in to upload</h1>
-      <p style={styles.subtitle}>Use the email and password set up in Supabase Authentication.</p>
+      <h1 style={styles.title}>Enter password to upload</h1>
+      <p style={styles.subtitle}>This page is password-protected.</p>
 
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-        style={styles.input}
-      />
       <input
         type="password"
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         required
+        autoFocus
         style={styles.input}
       />
       <button type="submit" disabled={loading} style={styles.button}>
-        {loading ? 'Logging in…' : 'Log in'}
+        {loading ? 'Unlocking…' : 'Unlock'}
       </button>
 
       {error && <div style={{ ...styles.notice, ...styles.noticeError }}>{error}</div>}

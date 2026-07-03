@@ -62,9 +62,14 @@ async function processFile(path) {
   if (downloadError) throw new Error(`Download failed: ${downloadError.message}`);
 
   const arrayBuffer = await fileBlob.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'buffer', cellDates: true });
+  // raw:true + cellDates:false — without these, xlsx auto-detects textual
+  // CSV dates and guesses them as US month-first (MM/DD/YYYY), silently
+  // turning "02/07/2026" (2 Jul) into Feb 7 before our code ever sees it.
+  // This keeps CSV date cells as their literal text and real Excel date
+  // cells as their numeric serial, so toDateOnly() can parse both explicitly.
+  const workbook = XLSX.read(arrayBuffer, { type: 'buffer', raw: true, cellDates: false });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });
 
   // 2. Aggregate — mirrors the same GROUP BY the dashboard uses:
   //    date x Medium x Call Status x BD x Channel Id.
@@ -125,8 +130,29 @@ async function processFile(path) {
 }
 
 function toDateOnly(value) {
-  const d = value instanceof Date ? value : new Date(value);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+  if (value instanceof Date) {
+    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()))
+      .toISOString().slice(0, 10);
+  }
+  // Real Excel date cells come through (with cellDates:false) as a raw
+  // serial number of days since the Excel epoch (Dec 30, 1899) — convert
+  // that directly rather than via a locale-dependent string.
+  if (typeof value === 'number') {
+    const days = Math.floor(value);
+    return new Date(Date.UTC(1899, 11, 30) + days * 86400000).toISOString().slice(0, 10);
+  }
+  // Plain-text cells (e.g. from a CSV export) come in as DD/MM/YYYY, not
+  // MM/DD/YYYY. `new Date(string)` assumes the US month-first order, which
+  // silently swaps day and month for dates like "02/07/2026" (2 July
+  // becomes 7 Feb) instead of erroring — so parse the day/month order
+  // explicitly rather than relying on Date's ambiguous string parsing.
+  const str = String(value).trim();
+  const dmy = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (dmy) {
+    const [, dd, mm, yyyy] = dmy;
+    return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+  }
+  return new Date(str).toISOString().slice(0, 10);
 }
 
 async function logRun(path, status, rowsParsed, segmentsUpserted, errorMessage) {
