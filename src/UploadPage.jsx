@@ -86,10 +86,61 @@ function LoginBox() {
   );
 }
 
+// How long to keep polling daily_upload_log for the matching entry
+// before giving up and telling the user to check back later.
+const PROCESSING_TIMEOUT_MS = 3 * 60 * 1000;
+const POLL_INTERVAL_MS = 2500;
+
 function UploadBox({ onLogout }) {
-  const [status, setStatus] = useState('idle'); // idle | uploading | done | error
+  // idle | uploading | processing | done | error | timeout
+  const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = useCallback((text) => {
+    setToast(text);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  const pollForProcessing = useCallback((path, uploadStartedIso) => {
+    const deadline = Date.now() + PROCESSING_TIMEOUT_MS;
+
+    const poll = async () => {
+      const { data, error } = await supabase
+        .from('daily_upload_log')
+        .select('*')
+        .eq('file_name', path)
+        .gte('processed_at', uploadStartedIso)
+        .order('processed_at', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        const log = data[0];
+        if (log.status === 'success') {
+          setStatus('done');
+          setMessage(`Processed ${log.rows_parsed} rows into ${log.segments_upserted} segments.`);
+          showToast('Data processing completed');
+          // Take the user to the live report now that it's updated.
+          setTimeout(() => { window.location.href = '/'; }, 1500);
+          return;
+        }
+        setStatus('error');
+        setMessage(log.error_message || 'Processing failed.');
+        return;
+      }
+
+      if (Date.now() > deadline) {
+        setStatus('timeout');
+        setMessage('Still processing — this is taking longer than usual. Check back in a few minutes.');
+        return;
+      }
+
+      setTimeout(poll, POLL_INTERVAL_MS);
+    };
+
+    poll();
+  }, [showToast]);
 
   const handleFile = useCallback(async (file) => {
     if (!file) return;
@@ -103,7 +154,8 @@ function UploadBox({ onLogout }) {
     setStatus('uploading');
     setMessage('');
 
-    const today = new Date().toISOString().slice(0, 10);
+    const uploadStartedIso = new Date().toISOString();
+    const today = uploadStartedIso.slice(0, 10);
     const ext = file.name.split('.').pop();
     const path = `report-${today}.${ext}`;
 
@@ -117,9 +169,10 @@ function UploadBox({ onLogout }) {
       return;
     }
 
-    setStatus('done');
-    setMessage(`Uploaded as ${path}. Processing will run automatically — check back in a minute.`);
-  }, []);
+    setStatus('processing');
+    setMessage(`Uploaded as ${path}. Processing…`);
+    pollForProcessing(path, uploadStartedIso);
+  }, [pollForProcessing]);
 
   const onDrop = useCallback((e) => {
     e.preventDefault();
@@ -127,8 +180,12 @@ function UploadBox({ onLogout }) {
     handleFile(e.dataTransfer.files?.[0]);
   }, [handleFile]);
 
+  const busy = status === 'uploading' || status === 'processing';
+
   return (
     <div>
+      {toast && <div style={styles.toast}>{toast}</div>}
+
       <a href="/" style={styles.backLink}>← Back to report</a>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -152,13 +209,41 @@ function UploadBox({ onLogout }) {
           type="file"
           accept=".xlsx,.xls,.csv"
           style={{ display: 'none' }}
+          disabled={busy}
           onChange={(e) => handleFile(e.target.files?.[0])}
         />
-        {status === 'uploading' ? <span>Uploading…</span> : <span>Drag a file here, or click to browse</span>}
+        {status === 'uploading' ? <span>Uploading…</span>
+          : status === 'processing' ? <span>Processing…</span>
+          : <span>Drag a file here, or click to browse</span>}
       </label>
 
+      {(status === 'uploading' || status === 'processing') && (
+        <div style={styles.statusBar}>
+          <div style={styles.statusRow}>
+            <StatusStep label="Uploaded" active={true} />
+            <StatusStep label="Processing" active={status === 'processing'} spinning={status === 'processing'} />
+            <StatusStep label="Complete" active={false} />
+          </div>
+          <div style={styles.statusTrack}>
+            <div style={{ ...styles.statusFill, width: status === 'uploading' ? '33%' : '66%' }} />
+          </div>
+          <div style={styles.statusMessage}>{message}</div>
+        </div>
+      )}
+
       {status === 'done' && <div style={{ ...styles.notice, ...styles.noticeSuccess }}>{message}</div>}
-      {status === 'error' && <div style={{ ...styles.notice, ...styles.noticeError }}>{message}</div>}
+      {(status === 'error' || status === 'timeout') && (
+        <div style={{ ...styles.notice, ...styles.noticeError }}>{message}</div>
+      )}
+    </div>
+  );
+}
+
+function StatusStep({ label, active, spinning }) {
+  return (
+    <div style={{ ...styles.statusStep, ...(active ? styles.statusStepActive : {}) }}>
+      {spinning ? <span style={styles.spinner} /> : null}
+      {label}
     </div>
   );
 }
@@ -255,4 +340,65 @@ const styles = {
   },
   noticeSuccess: { background: 'rgba(13,148,136,0.10)', color: '#0d9488' },
   noticeError: { background: 'rgba(214,41,62,0.10)', color: '#d6293e' },
+  statusBar: {
+    marginTop: 16,
+    padding: '14px 16px',
+    border: '1px solid #e1e6ef',
+    borderRadius: 10,
+    background: '#f4f6fa',
+  },
+  statusRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  statusStep: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontFamily: "'IBM Plex Mono', monospace",
+    fontSize: 11,
+    color: '#9399ac',
+  },
+  statusStepActive: { color: '#0d9488', fontWeight: 600 },
+  statusTrack: {
+    height: 5,
+    borderRadius: 3,
+    background: '#eef1f7',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  statusFill: {
+    height: '100%',
+    borderRadius: 3,
+    background: '#0d9488',
+    transition: 'width .4s ease',
+  },
+  statusMessage: {
+    fontSize: 12,
+    color: '#5c6479',
+    fontFamily: "'IBM Plex Mono', monospace",
+  },
+  spinner: {
+    display: 'inline-block',
+    width: 9,
+    height: 9,
+    borderRadius: '50%',
+    border: '1.5px solid rgba(13,148,136,0.3)',
+    borderTopColor: '#0d9488',
+    animation: 'spin .7s linear infinite',
+  },
+  toast: {
+    position: 'fixed',
+    top: 20,
+    right: 20,
+    padding: '12px 18px',
+    borderRadius: 8,
+    background: '#151b2c',
+    color: '#fff',
+    fontFamily: "'IBM Plex Mono', monospace",
+    fontSize: 12.5,
+    boxShadow: '0 4px 16px rgba(20,25,40,0.18)',
+    zIndex: 1000,
+  },
 };

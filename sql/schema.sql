@@ -54,6 +54,16 @@ create table if not exists daily_upload_log (
   processed_at   timestamptz not null default now()
 );
 
+-- Lets the upload page poll this table (via the anon key + logged-in
+-- session) to detect when its own file has finished processing, so it
+-- can show a "processing complete" status instead of a blind guess.
+alter table daily_upload_log enable row level security;
+
+create policy "authenticated users can view upload log"
+  on daily_upload_log for select
+  to authenticated
+  using (true);
+
 -- 3. Storage bucket for the raw daily exports.
 --    Private — only the service role (used by the processing
 --    function) and authenticated users (via the upload page) can
