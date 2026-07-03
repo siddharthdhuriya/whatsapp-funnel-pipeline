@@ -138,6 +138,21 @@ function channelName(id){ return CHANNEL_NAMES[id] || ('Channel '+id); }
 
 const dateFromEl = document.getElementById('dateFrom');
 const dateToEl = document.getElementById('dateTo');
+const dateFromLabelEl = document.getElementById('dateFromLabel');
+const dateToLabelEl = document.getElementById('dateToLabel');
+
+// The native <input type=date> always stores/reads its .value as ISO
+// (YYYY-MM-DD) regardless of display locale — only the on-screen text
+// (which we hide via CSS and replace with these labels) varies by browser.
+function formatDMY(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return `${d}-${m}-${y}`;
+}
+function updateDateLabels(){
+  dateFromLabelEl.textContent = formatDMY(dateFromEl.value);
+  dateToLabelEl.textContent = formatDMY(dateToEl.value);
+}
 
 const state = {
   Medium: new Set(),       // empty set = all selected
@@ -204,24 +219,25 @@ function setupStaticListeners(){
   if (staticListenersBound) return;
   staticListenersBound = true;
 
-  dateFromEl.addEventListener('change', render);
-  dateToEl.addEventListener('change', render);
+  dateFromEl.addEventListener('change', ()=>{ updateDateLabels(); render(); });
+  dateToEl.addEventListener('change', ()=>{ updateDateLabels(); render(); });
 
   document.getElementById('qAll').addEventListener('click', ()=>{
-    dateFromEl.value = minDate; dateToEl.value = maxDate; render();
+    dateFromEl.value = minDate; dateToEl.value = maxDate; updateDateLabels(); render();
   });
   document.getElementById('qLast3').addEventListener('click', ()=>{
     const idx = Math.max(0, allDates.length-3);
-    dateFromEl.value = allDates[idx]; dateToEl.value = maxDate; render();
+    dateFromEl.value = allDates[idx]; dateToEl.value = maxDate; updateDateLabels(); render();
   });
   document.getElementById('qYesterday').addEventListener('click', ()=>{
     const idx = Math.max(0, allDates.length-2);
-    dateFromEl.value = allDates[idx]; dateToEl.value = allDates[idx]; render();
+    dateFromEl.value = allDates[idx]; dateToEl.value = allDates[idx]; updateDateLabels(); render();
   });
 
   document.getElementById('resetBtn').addEventListener('click', ()=>{
     state.Medium.clear(); state['Call Status'].clear(); state.BD.clear();
     dateFromEl.value = minDate; dateToEl.value = maxDate;
+    updateDateLabels();
     updatePillStyles();
     render();
   });
@@ -244,6 +260,7 @@ function setupDateBoundsAndFilters(){
   dateFromEl.min = minDate; dateFromEl.max = maxDate;
   dateToEl.min = minDate; dateToEl.max = maxDate;
   dateFromEl.value = minDate; dateToEl.value = maxDate;
+  updateDateLabels();
 
   const mediums = uniqueSorted('Medium');
   const callStatuses = uniqueSorted('Call Status');
@@ -268,7 +285,7 @@ function render(){
 
   document.getElementById('resultCount').textContent = `${fmt(filtered.length)} segment rows → ${fmt(tot.total)} leads`;
   document.getElementById('totalRowsStamp').textContent = fmt(RAW.reduce((a,r)=>a+r.total,0));
-  document.getElementById('recordSubtitle').textContent = `Filtered view: ${fmt(tot.total)} leads · ${dateFromEl.value} to ${dateToEl.value} · ${new Set(filtered.map(r=>r['Channel Id'])).size} channel(s)`;
+  document.getElementById('recordSubtitle').textContent = `Filtered view: ${fmt(tot.total)} leads · ${formatDMY(dateFromEl.value)} to ${formatDMY(dateToEl.value)} · ${new Set(filtered.map(r=>r['Channel Id'])).size} channel(s)`;
 
   // KPI strip
   const kpis = [

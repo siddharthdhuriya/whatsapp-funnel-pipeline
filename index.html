@@ -138,12 +138,24 @@
 
   /* DATE SELECTOR */
   .date-inputs{display:flex; align-items:center; gap:8px;}
-  .date-inputs input[type=date]{
-    font-family:var(--font-mono); font-size:12px; color:var(--text);
+  /* The browser renders <input type=date>'s value using the OS/browser
+     locale (often MM/DD/YYYY), which reads like a swapped DD-MM-YYYY date
+     and caused 02-07-2026 (2 Jul) to display as if it were 7 Feb. The
+     native text is hidden (color:transparent) and a DD-MM-YYYY label we
+     control is overlaid on top instead — the picker/value underneath is
+     untouched, only what's displayed changes. */
+  .date-field{position:relative; display:inline-flex; align-items:center;}
+  .date-field input[type=date]{
+    font-family:var(--font-mono); font-size:12px; color:transparent;
     background:#ffffff; border:1px solid var(--border); border-radius:7px;
     padding:6px 9px; outline:none;
   }
-  .date-inputs input[type=date]:focus{border-color:var(--teal);}
+  .date-field input[type=date]::-webkit-datetime-edit{color:transparent;}
+  .date-field input[type=date]:focus{border-color:var(--teal);}
+  .date-label{
+    position:absolute; left:9px; top:50%; transform:translateY(-50%);
+    pointer-events:none; font-family:var(--font-mono); font-size:12px; color:var(--text);
+  }
   .date-inputs .to{font-family:var(--font-mono); font-size:11px; color:var(--text-faint);}
   .date-quick{display:flex; gap:6px; margin-top:2px;}
 
@@ -279,9 +291,15 @@
       <div class="filter-group">
         <div class="filter-label">Date Range</div>
         <div class="date-inputs">
-          <input type="date" id="dateFrom">
+          <div class="date-field">
+            <input type="date" id="dateFrom">
+            <span class="date-label" id="dateFromLabel"></span>
+          </div>
           <span class="to">to</span>
-          <input type="date" id="dateTo">
+          <div class="date-field">
+            <input type="date" id="dateTo">
+            <span class="date-label" id="dateToLabel"></span>
+          </div>
         </div>
         <div class="date-quick">
           <div class="pill" id="qAll">All dates</div>
