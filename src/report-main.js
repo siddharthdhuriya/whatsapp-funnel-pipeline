@@ -215,6 +215,16 @@ function fmt(n){ return n.toLocaleString('en-IN'); }
 function pct(n,d){ return d>0 ? ((n/d)*100).toFixed(1)+'%' : '–'; }
 function pctVal(n,d){ return d>0 ? (n/d)*100 : -1; }
 
+// Cost — ₹0.107 paise per delivered WhatsApp message
+const COST_PER_DELIVERED_PAISE = 10.7;
+function rupee(n, decimals){ return n===null ? '–' : '₹'+n.toLocaleString('en-IN',{minimumFractionDigits:decimals, maximumFractionDigits:decimals}); }
+
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function dayAbbrev(iso){
+  const [y,m,d] = iso.split('-').map(Number);
+  return DAY_NAMES[new Date(Date.UTC(y, m-1, d)).getUTCDay()];
+}
+
 function setupStaticListeners(){
   if (staticListenersBound) return;
   staticListenersBound = true;
@@ -240,6 +250,19 @@ function setupStaticListeners(){
     updateDateLabels();
     updatePillStyles();
     render();
+  });
+
+  const tabBtnDayWise = document.getElementById('tabBtnDayWise');
+  const tabBtnChannel = document.getElementById('tabBtnChannel');
+  const dayWiseTab = document.getElementById('dayWiseTab');
+  const channelTab = document.getElementById('channelTab');
+  tabBtnDayWise.addEventListener('click', ()=>{
+    tabBtnDayWise.classList.add('active'); tabBtnChannel.classList.remove('active');
+    dayWiseTab.classList.remove('hidden'); channelTab.classList.add('hidden');
+  });
+  tabBtnChannel.addEventListener('click', ()=>{
+    tabBtnChannel.classList.add('active'); tabBtnDayWise.classList.remove('active');
+    channelTab.classList.remove('hidden'); dayWiseTab.classList.add('hidden');
   });
 
   document.querySelectorAll('th.sortable').forEach(th=>{
@@ -321,13 +344,9 @@ function render(){
   document.getElementById('approvedVal').textContent = fmt(tot.approved);
   document.getElementById('approvedPct').textContent = pct(tot.approved, tot.total)+' of leads';
 
-  // Cost — ₹0.107 paise per delivered WhatsApp message
-  const COST_PER_DELIVERED_PAISE = 10.7;
   const totalCostRupees = tot.delivered * COST_PER_DELIVERED_PAISE / 100;
   const costPerConverted = tot.converted>0 ? totalCostRupees / tot.converted : null;
   const costPerEnriched = tot.enriched>0 ? totalCostRupees / tot.enriched : null;
-
-  function rupee(n, decimals){ return n===null ? '–' : '₹'+n.toLocaleString('en-IN',{minimumFractionDigits:decimals, maximumFractionDigits:decimals}); }
 
   document.getElementById('totalCostVal').textContent = rupee(totalCostRupees, 2);
   document.getElementById('totalCostSub').textContent = `${fmt(tot.delivered)} delivered × 10.7 paise`;
@@ -378,6 +397,67 @@ function render(){
   `;
   }).join('');
   tbody.innerHTML = html;
+
+  renderDayWise(filtered, tot);
+}
+
+function renderDayWise(filtered, tot){
+  const byDate = {};
+  filtered.forEach(r=>{
+    if(!byDate[r.date]) byDate[r.date] = {date:r.date,total:0,sent:0,delivered:0,converted:0,enriched:0,approved:0};
+    const d = byDate[r.date];
+    d.total+=r.total; d.sent+=r.sent; d.delivered+=r.delivered;
+    d.converted+=r.converted; d.enriched+=r.enriched; d.approved+=r.approved;
+  });
+  const days = Object.values(byDate).sort((a,b)=> b.date.localeCompare(a.date));
+
+  document.getElementById('dayWiseCount').textContent = days.length + ' day' + (days.length===1?'':'s');
+
+  function costCells(delivered, converted, enriched){
+    const totalCost = delivered * COST_PER_DELIVERED_PAISE / 100;
+    const perConv = converted>0 ? totalCost/converted : null;
+    const perEnrich = enriched>0 ? totalCost/enriched : null;
+    return `<td>${rupee(totalCost,2)}</td><td>${rupee(perConv,2)}</td><td>${rupee(perEnrich,2)}</td>`;
+  }
+
+  const overallConvPct = pctVal(tot.converted, tot.delivered);
+  let html = `<tr class="overall-row">
+    <td>OVERALL</td>
+    <td>–</td>
+    <td>${fmt(tot.sent)}</td>
+    <td>${fmt(tot.delivered)}</td>
+    <td class="pct">${pct(tot.delivered,tot.sent)}</td>
+    <td>${fmt(tot.converted)}</td>
+    <td class="pct${overallConvPct>=0 && overallConvPct<10 ? ' low':''}">${pct(tot.converted,tot.delivered)}</td>
+    <td>${fmt(tot.enriched)}</td>
+    <td class="pct">${pct(tot.enriched,tot.total)}</td>
+    <td>${fmt(tot.approved)}</td>
+    <td class="pct">${pct(tot.approved,tot.total)}</td>
+    ${costCells(tot.delivered, tot.converted, tot.enriched)}
+  </tr>`;
+
+  html += days.map(d=>{
+    const convPct = pctVal(d.converted, d.delivered);
+    const isLow = convPct>=0 && convPct<10;
+    return `
+    <tr>
+      <td>${formatDMY(d.date)}</td>
+      <td>${dayAbbrev(d.date)}</td>
+      <td>${fmt(d.sent)}</td>
+      <td>${fmt(d.delivered)}</td>
+      <td class="pct">${pct(d.delivered,d.sent)}</td>
+      <td>${fmt(d.converted)}</td>
+      <td class="pct${isLow ? ' low':''}">${pct(d.converted,d.delivered)}</td>
+      <td>${fmt(d.enriched)}</td>
+      <td class="pct">${pct(d.enriched,d.total)}</td>
+      <td>${fmt(d.approved)}</td>
+      <td class="pct">${pct(d.approved,d.total)}</td>
+      ${costCells(d.delivered, d.converted, d.enriched)}
+    </tr>
+  `;
+  }).join('');
+
+  document.getElementById('dayWiseTableBody').innerHTML = html;
 }
 
 async function loadAndRender(){

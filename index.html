@@ -226,6 +226,16 @@
   th.sortable:hover{color:var(--teal);}
   th .arrow{font-size:9px; margin-left:2px; opacity:.6;}
 
+  /* TABS */
+  .tabs-row{display:flex; gap:8px; margin-bottom:12px;}
+  .tab-btn{
+    font-family:var(--font-mono); font-size:12px; padding:6px 14px;
+    border-radius:8px; border:1px solid var(--border); background:#fff;
+    color:var(--text-dim); cursor:pointer; transition:all .15s ease;
+  }
+  .tab-btn:hover{border-color:var(--teal); color:var(--text);}
+  .tab-btn.active{background:var(--teal-dim); border-color:var(--teal); color:var(--teal); font-weight:600;}
+
   /* Funnel bars viz */
   .stagebar{margin-bottom:18px;}
   .stagebar .srow{display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:11.5px; margin-bottom:6px;}
@@ -328,24 +338,59 @@
 
     <div class="maingrid">
       <div class="panel">
-        <h2>Channel Breakdown <span class="tag" id="channelCount">–</span></h2>
-        <div class="desc">Sent, delivered and converted counts per channel for the current filter selection. Overall totals pinned on top. Converted % below 10% is flagged in red.</div>
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th class="sortable" data-key="channel">Channel <span class="arrow">▾</span></th>
-                <th class="sortable" data-key="bd">BD <span class="arrow"></span></th>
-                <th class="sortable" data-key="total">Leads <span class="arrow"></span></th>
-                <th class="sortable" data-key="sent">Sent <span class="arrow"></span></th>
-                <th class="sortable" data-key="delivered">Delivered <span class="arrow"></span></th>
-                <th>Delivered %</th>
-                <th class="sortable" data-key="converted">Converted <span class="arrow"></span></th>
-                <th class="sortable" data-key="convPct">Converted % <span class="arrow"></span></th>
-              </tr>
-            </thead>
-            <tbody id="channelTableBody"></tbody>
-          </table>
+        <div class="tabs-row">
+          <div class="tab-btn active" id="tabBtnDayWise" data-tab="daywise">Day Wise</div>
+          <div class="tab-btn" id="tabBtnChannel" data-tab="channel">Channel Breakdown</div>
+        </div>
+
+        <div id="dayWiseTab">
+          <h2 style="margin-bottom:3px;">Day Wise <span class="tag" id="dayWiseCount">–</span></h2>
+          <div class="desc">Daily totals for the current filter selection, most recent day first. Cost figures use the same ₹0.107/delivered-message rate as the summary cards above.</div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Day</th>
+                  <th>Sent</th>
+                  <th>Delivered</th>
+                  <th>Delivered %</th>
+                  <th>Converted</th>
+                  <th>Converted %</th>
+                  <th>Enriched</th>
+                  <th>Enriched %</th>
+                  <th>Approved</th>
+                  <th>Approved %</th>
+                  <th>Total Cost</th>
+                  <th>Cost / Converted</th>
+                  <th>Cost / Enriched</th>
+                </tr>
+              </thead>
+              <tbody id="dayWiseTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="channelTab" class="hidden">
+          <h2 style="margin-bottom:3px;">Channel Breakdown <span class="tag" id="channelCount">–</span></h2>
+          <div class="desc">Sent, delivered and converted counts per channel for the current filter selection. Overall totals pinned on top. Converted % below 10% is flagged in red.</div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th class="sortable" data-key="channel">Channel <span class="arrow">▾</span></th>
+                  <th class="sortable" data-key="bd">BD <span class="arrow"></span></th>
+                  <th class="sortable" data-key="total">Leads <span class="arrow"></span></th>
+                  <th class="sortable" data-key="sent">Sent <span class="arrow"></span></th>
+                  <th class="sortable" data-key="delivered">Delivered <span class="arrow"></span></th>
+                  <th>Delivered %</th>
+                  <th class="sortable" data-key="converted">Converted <span class="arrow"></span></th>
+                  <th class="sortable" data-key="convPct">Converted % <span class="arrow"></span></th>
+                </tr>
+              </thead>
+              <tbody id="channelTableBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
