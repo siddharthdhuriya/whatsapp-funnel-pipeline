@@ -179,7 +179,7 @@ function renderPills(containerId, values, stateKey, labelFn){
       } else if(set.has(v)){
         set.delete(v);
       } else {
-        set.delete(v);
+        set.add(v);
       }
       updatePillStyles();
       render();
@@ -192,8 +192,10 @@ function renderPills(containerId, values, stateKey, labelFn){
 function updatePillStylesFor(containerId, stateKey){
   const el = document.getElementById(containerId);
   [...el.children].forEach(p=>{
-    const v = p.dataset.value;
-    const excluded = state[stateKey].has(v);
+    // p.dataset.value is always a string (HTML dataset attributes), but
+    // the excluded set can hold numbers (e.g. BD is a smallint column) —
+    // compare by string form so numeric filters highlight correctly too.
+    const excluded = [...state[stateKey]].some(x => String(x) === p.dataset.value);
     p.classList.toggle('active', !excluded);
   });
 }
@@ -225,6 +227,20 @@ function dayAbbrev(iso){
   return DAY_NAMES[new Date(Date.UTC(y, m-1, d)).getUTCDay()];
 }
 
+// "Yesterday" / "Last 7 days" are relative to the real current date (not
+// the latest date present in the uploaded data), so they keep working
+// correctly even on days when a fresh export hasn't been uploaded yet.
+function todayIso(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function addDaysIso(iso, delta){
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m-1, d));
+  dt.setUTCDate(dt.getUTCDate()+delta);
+  return dt.toISOString().slice(0,10);
+}
+
 function setupStaticListeners(){
   if (staticListenersBound) return;
   staticListenersBound = true;
@@ -235,13 +251,13 @@ function setupStaticListeners(){
   document.getElementById('qAll').addEventListener('click', ()=>{
     dateFromEl.value = minDate; dateToEl.value = maxDate; updateDateLabels(); render();
   });
-  document.getElementById('qLast3').addEventListener('click', ()=>{
-    const idx = Math.max(0, allDates.length-3);
-    dateFromEl.value = allDates[idx]; dateToEl.value = maxDate; updateDateLabels(); render();
+  document.getElementById('qLast7').addEventListener('click', ()=>{
+    const today = todayIso();
+    dateFromEl.value = addDaysIso(today, -6); dateToEl.value = today; updateDateLabels(); render();
   });
   document.getElementById('qYesterday').addEventListener('click', ()=>{
-    const idx = Math.max(0, allDates.length-2);
-    dateFromEl.value = allDates[idx]; dateToEl.value = allDates[idx]; updateDateLabels(); render();
+    const yesterday = addDaysIso(todayIso(), -1);
+    dateFromEl.value = yesterday; dateToEl.value = yesterday; updateDateLabels(); render();
   });
 
   document.getElementById('resetBtn').addEventListener('click', ()=>{
