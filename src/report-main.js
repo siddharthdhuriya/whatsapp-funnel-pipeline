@@ -354,8 +354,8 @@ function render(){
     {label:'WhatsApp Sent', val: tot.sent, sub: pct(tot.sent,tot.total)+' of leads', color:'#0d9488', bar: tot.total? tot.sent/tot.total*100:0},
     {label:'Delivered', val: tot.delivered, sub: pct(tot.delivered,tot.sent)+' of sent', color:'#6d5bd0', bar: tot.sent? tot.delivered/tot.sent*100:0},
     {label:'Converted', val: tot.converted, sub: pct(tot.converted,tot.delivered)+' of delivered', color:'#c2760a', bar: tot.delivered? tot.converted/tot.delivered*100:0},
-    {label:'Enriched', val: tot.enriched, sub: pct(tot.enriched,tot.total)+' of leads', color:'#6d5bd0', bar: tot.total? tot.enriched/tot.total*100:0},
-    {label:'Approved', val: tot.approved, sub: pct(tot.approved,tot.total)+' of leads', color:'#d6293e', bar: tot.total? tot.approved/tot.total*100:0},
+    {label:'Enriched', val: tot.enriched, sub: pct(tot.enriched,tot.delivered)+' of delivered', color:'#6d5bd0', bar: tot.delivered? tot.enriched/tot.delivered*100:0},
+    {label:'Approved', val: tot.approved, sub: pct(tot.approved,tot.delivered)+' of delivered', color:'#d6293e', bar: tot.delivered? tot.approved/tot.delivered*100:0},
   ];
   const strip = document.getElementById('kpiStrip');
   strip.innerHTML = kpis.map(k=>`
@@ -378,9 +378,9 @@ function render(){
   document.getElementById('fConvBar').style.width = convPctOfSent+'%';
 
   document.getElementById('enrichedVal').textContent = fmt(tot.enriched);
-  document.getElementById('enrichedPct').textContent = pct(tot.enriched, tot.total)+' of leads';
+  document.getElementById('enrichedPct').textContent = pct(tot.enriched, tot.delivered)+' of delivered';
   document.getElementById('approvedVal').textContent = fmt(tot.approved);
-  document.getElementById('approvedPct').textContent = pct(tot.approved, tot.total)+' of leads';
+  document.getElementById('approvedPct').textContent = pct(tot.approved, tot.delivered)+' of delivered';
 
   const totalCostRupees = tot.delivered * COST_PER_DELIVERED_PAISE / 100;
   const costPerConverted = tot.converted>0 ? totalCostRupees / tot.converted : null;
@@ -469,9 +469,9 @@ function renderDayWise(filtered, tot){
     <td>${fmt(tot.converted)}</td>
     <td class="pct${overallConvPct>=0 && overallConvPct<10 ? ' low':''}">${pct(tot.converted,tot.delivered)}</td>
     <td>${fmt(tot.enriched)}</td>
-    <td class="pct">${pct(tot.enriched,tot.total)}</td>
+    <td class="pct">${pct(tot.enriched,tot.delivered)}</td>
     <td>${fmt(tot.approved)}</td>
-    <td class="pct">${pct(tot.approved,tot.total)}</td>
+    <td class="pct">${pct(tot.approved,tot.delivered)}</td>
     ${costCells(tot.delivered, tot.converted, tot.enriched)}
   </tr>`;
 
@@ -488,9 +488,9 @@ function renderDayWise(filtered, tot){
       <td>${fmt(d.converted)}</td>
       <td class="pct${isLow ? ' low':''}">${pct(d.converted,d.delivered)}</td>
       <td>${fmt(d.enriched)}</td>
-      <td class="pct">${pct(d.enriched,d.total)}</td>
+      <td class="pct">${pct(d.enriched,d.delivered)}</td>
       <td>${fmt(d.approved)}</td>
-      <td class="pct">${pct(d.approved,d.total)}</td>
+      <td class="pct">${pct(d.approved,d.delivered)}</td>
       ${costCells(d.delivered, d.converted, d.enriched)}
     </tr>
   `;
@@ -553,7 +553,7 @@ function renderTrends(filtered){
   const weeks = Object.values(byWeek).sort((a,b)=>a.week.localeCompare(b.week));
   weeks.forEach(w=>{
     w.convPct = pctVal(w.converted, w.delivered);
-    w.enrichPct = pctVal(w.enriched, w.total);
+    w.enrichPct = pctVal(w.enriched, w.delivered);
   });
 
   document.getElementById('trendsWeekCount').textContent = weeks.length + ' week' + (weeks.length===1?'':'s');
@@ -577,10 +577,10 @@ function renderTrends(filtered){
       <td class="pct">${pct(w.converted,w.delivered)}</td>
       <td>${deltaCell(deltaConv, DEVIATION_THRESHOLD_PTS)}</td>
       <td>${fmt(w.enriched)}</td>
-      <td class="pct">${pct(w.enriched,w.total)}</td>
+      <td class="pct">${pct(w.enriched,w.delivered)}</td>
       <td>${deltaCell(deltaEnrich, DEVIATION_THRESHOLD_PTS)}</td>
       <td>${fmt(w.approved)}</td>
-      <td class="pct">${pct(w.approved,w.total)}</td>
+      <td class="pct">${pct(w.approved,w.delivered)}</td>
     </tr>`;
   }).join('') || `<tr><td colspan="12" style="text-align:center; color:var(--text-faint);">No data in range</td></tr>`;
 
@@ -633,8 +633,8 @@ function renderTrends(filtered){
 
     const convThis = t ? pctVal(t.converted, t.delivered) : -1;
     const convLast = l ? pctVal(l.converted, l.delivered) : -1;
-    const enrichThis = t ? pctVal(t.enriched, t.total) : -1;
-    const enrichLast = l ? pctVal(l.enriched, l.total) : -1;
+    const enrichThis = t ? pctVal(t.enriched, t.delivered) : -1;
+    const enrichLast = l ? pctVal(l.enriched, l.delivered) : -1;
     const deltaConv = (convThis>=0 && convLast>=0) ? convThis-convLast : null;
     const deltaEnrich = (enrichThis>=0 && enrichLast>=0) ? enrichThis-enrichLast : null;
 
