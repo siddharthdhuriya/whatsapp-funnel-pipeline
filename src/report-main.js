@@ -373,9 +373,9 @@ function render(){
   const delPctOfSent = tot.sent? tot.delivered/tot.sent*100 : 0;
   document.getElementById('fDelVal').textContent = `${fmt(tot.delivered)} (${delPctOfSent.toFixed(1)}%)`;
   document.getElementById('fDelBar').style.width = delPctOfSent+'%';
-  const convPctOfSent = tot.sent? tot.converted/tot.sent*100 : 0;
-  document.getElementById('fConvVal').textContent = `${fmt(tot.converted)} (${convPctOfSent.toFixed(1)}% of sent)`;
-  document.getElementById('fConvBar').style.width = convPctOfSent+'%';
+  const convPctOfDelivered = tot.delivered? tot.converted/tot.delivered*100 : 0;
+  document.getElementById('fConvVal').textContent = `${fmt(tot.converted)} (${convPctOfDelivered.toFixed(1)}% of delivered)`;
+  document.getElementById('fConvBar').style.width = convPctOfDelivered+'%';
 
   document.getElementById('enrichedVal').textContent = fmt(tot.enriched);
   document.getElementById('enrichedPct').textContent = pct(tot.enriched, tot.delivered)+' of delivered';
