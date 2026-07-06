@@ -1,9 +1,10 @@
 // src/UploadPage.jsx
 //
 // A one-page uploader: log in, drag today's export in, it lands in
-// the `daily-exports` Supabase Storage bucket, and the Database
-// Webhook takes over from there. This page never talks to the
-// processing function directly — Storage is the handoff point.
+// the `daily-exports` Supabase Storage bucket, then this page calls
+// the processing function directly (in addition to the Storage
+// webhook, which only fires on INSERT and would otherwise miss
+// re-uploads of an existing day's file, which are UPDATEs).
 
 import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -41,7 +42,7 @@ export default function UploadPage() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        {session ? <UploadBox onLogout={() => supabase.auth.signOut()} /> : <LoginBox />}
+        {session ? <UploadBox session={session} onLogout={() => supabase.auth.signOut()} /> : <LoginBox />}
       </div>
     </div>
   );
@@ -91,7 +92,14 @@ function LoginBox() {
 const PROCESSING_TIMEOUT_MS = 3 * 60 * 1000;
 const POLL_INTERVAL_MS = 2500;
 
-function UploadBox({ onLogout }) {
+// Supabase Storage keys can't contain some characters browsers/exports
+// commonly produce (spaces, #, ?, etc. are fine, but keep this
+// conservative so any file name is a valid object key).
+function sanitizeFileName(name) {
+  return name.trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
+}
+
+function UploadBox({ session, onLogout }) {
   // idle | uploading | processing | done | error | timeout
   const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState('');
@@ -105,13 +113,21 @@ function UploadBox({ onLogout }) {
 
   const pollForProcessing = useCallback((path, uploadStartedIso) => {
     const deadline = Date.now() + PROCESSING_TIMEOUT_MS;
+    // The server that stamps processed_at and this browser's clock are
+    // never perfectly in sync (a user's machine clock can easily be off
+    // by more than a second) — without slack here, a processing run that
+    // finishes just before the client's own upload-start timestamp gets
+    // filtered out as "too old", leaving the page stuck polling forever
+    // even though processing actually succeeded.
+    const CLOCK_SKEW_TOLERANCE_MS = 60 * 1000;
+    const cutoff = new Date(new Date(uploadStartedIso).getTime() - CLOCK_SKEW_TOLERANCE_MS).toISOString();
 
     const poll = async () => {
       const { data, error } = await supabase
         .from('daily_upload_log')
         .select('*')
         .eq('file_name', path)
-        .gte('processed_at', uploadStartedIso)
+        .gte('processed_at', cutoff)
         .order('processed_at', { ascending: false })
         .limit(1);
 
@@ -155,9 +171,11 @@ function UploadBox({ onLogout }) {
     setMessage('');
 
     const uploadStartedIso = new Date().toISOString();
-    const today = uploadStartedIso.slice(0, 10);
-    const ext = file.name.split('.').pop();
-    const path = `report-${today}.${ext}`;
+    // Keep the file's own name instead of renaming it to report-<date>.ext —
+    // renaming every upload to the same date-based name made distinct files
+    // (different exports, different content) collide into a single storage
+    // object, silently discarding all but the last one uploaded that day.
+    const path = sanitizeFileName(file.name);
 
     const { error } = await supabase.storage
       .from(BUCKET)
@@ -171,8 +189,24 @@ function UploadBox({ onLogout }) {
 
     setStatus('processing');
     setMessage(`Uploaded as ${path}. Processing…`);
+
+    // Trigger processing directly rather than relying solely on the
+    // Storage webhook — re-uploading an existing day's file is an UPDATE,
+    // not an INSERT, so the (INSERT-only) webhook never fires for it and
+    // this page would otherwise poll forever. Best-effort: pollForProcessing
+    // below is still the source of truth for detecting the outcome, so a
+    // failed/slow fetch here doesn't break the flow.
+    fetch('/api/process-upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ bucket_id: BUCKET, name: path }),
+    }).catch(() => {});
+
     pollForProcessing(path, uploadStartedIso);
-  }, [pollForProcessing]);
+  }, [pollForProcessing, session]);
 
   const onDrop = useCallback((e) => {
     e.preventDefault();

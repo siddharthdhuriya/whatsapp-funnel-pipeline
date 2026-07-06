@@ -24,11 +24,24 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Verify the request actually came from your Supabase webhook,
-  // not from someone who found this URL.
+  // Two ways in are accepted:
+  //  1. The Supabase Storage webhook, authenticated with the shared secret.
+  //  2. A logged-in upload-page user, authenticated with their own Supabase
+  //     session token — this lets the client trigger processing directly
+  //     right after an upload, since the webhook only fires on Storage
+  //     INSERT and never on UPDATE (i.e. re-uploading an existing day's
+  //     file), which would otherwise silently never get processed again.
   const authHeader = req.headers['authorization'] || '';
-  const expected = `Bearer ${process.env.PROCESS_WEBHOOK_SECRET}`;
-  if (authHeader !== expected) {
+  const expectedWebhook = `Bearer ${process.env.PROCESS_WEBHOOK_SECRET}`;
+  let authorized = authHeader === expectedWebhook;
+
+  if (!authorized && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const { data, error } = await supabase.auth.getUser(token);
+    authorized = !error && !!data?.user;
+  }
+
+  if (!authorized) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
