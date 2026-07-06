@@ -102,18 +102,19 @@
 
   /* FILTER BAR */
   .filterbar{
-    display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;
+    display:flex; gap:14px; flex-wrap:wrap; align-items:center;
     background:var(--surface-alt); border:1px solid var(--border);
-    border-radius:10px; padding:16px 18px; margin-bottom:26px;
+    border-radius:10px; padding:11px 16px; margin-bottom:22px;
   }
-  .filter-group{display:flex; flex-direction:column; gap:8px;}
+  .filter-group{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
   .filter-label{
-    font-family:var(--font-mono); font-size:10px; letter-spacing:.12em;
-    text-transform:uppercase; color:var(--text-faint);
+    font-family:var(--font-mono); font-size:9.5px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--text-faint); white-space:nowrap;
   }
-  .pill-row{display:flex; gap:6px; flex-wrap:wrap;}
+  .filter-divider{width:1px; align-self:stretch; background:var(--border); flex-shrink:0;}
+  .pill-row{display:flex; gap:5px; flex-wrap:wrap;}
   .pill{
-    font-family:var(--font-mono); font-size:12px; padding:6px 12px;
+    font-family:var(--font-mono); font-size:11.5px; padding:5px 10px;
     border-radius:999px; border:1px solid var(--border);
     background:#ffffff; color:var(--text-dim);
     cursor:pointer; user-select:none; transition:all .15s ease;
@@ -125,19 +126,18 @@
   }
   .filter-spacer{flex:1;}
   .reset-btn{
-    align-self:flex-end;
     font-family:var(--font-mono); font-size:11px; letter-spacing:.06em;
     color:var(--text-dim); background:#ffffff; border:1px solid var(--border);
-    border-radius:8px; padding:8px 14px; cursor:pointer; transition:all .15s ease;
+    border-radius:8px; padding:6px 12px; cursor:pointer; transition:all .15s ease;
+    white-space:nowrap;
   }
   .reset-btn:hover{color:var(--red); border-color:var(--red);}
   .result-count{
-    font-family:var(--font-mono); font-size:11px; color:var(--text-faint); align-self:flex-end;
-    padding-bottom:9px;
+    font-family:var(--font-mono); font-size:11px; color:var(--text-faint); white-space:nowrap;
   }
 
   /* DATE SELECTOR */
-  .date-inputs{display:flex; align-items:center; gap:8px;}
+  .date-inputs{display:flex; align-items:center; gap:6px;}
   /* The browser renders <input type=date>'s value using the OS/browser
      locale (often MM/DD/YYYY), which reads like a swapped DD-MM-YYYY date
      and caused 02-07-2026 (2 Jul) to display as if it were 7 Feb. The
@@ -146,18 +146,18 @@
      untouched, only what's displayed changes. */
   .date-field{position:relative; display:inline-flex; align-items:center;}
   .date-field input[type=date]{
-    font-family:var(--font-mono); font-size:12px; color:transparent;
+    font-family:var(--font-mono); font-size:11.5px; color:transparent;
     background:#ffffff; border:1px solid var(--border); border-radius:7px;
-    padding:6px 9px; outline:none;
+    padding:5px 8px; outline:none;
   }
   .date-field input[type=date]::-webkit-datetime-edit{color:transparent;}
   .date-field input[type=date]:focus{border-color:var(--teal);}
   .date-label{
-    position:absolute; left:9px; top:50%; transform:translateY(-50%);
-    pointer-events:none; font-family:var(--font-mono); font-size:12px; color:var(--text);
+    position:absolute; left:8px; top:50%; transform:translateY(-50%);
+    pointer-events:none; font-family:var(--font-mono); font-size:11.5px; color:var(--text);
   }
   .date-inputs .to{font-family:var(--font-mono); font-size:11px; color:var(--text-faint);}
-  .date-quick{display:flex; gap:6px; margin-top:2px;}
+  .date-quick{display:flex; gap:5px; flex-wrap:wrap;}
 
   /* FUNNEL / KPI STRIP */
   .funnel{
@@ -320,7 +320,7 @@
 
     <div class="filterbar">
       <div class="filter-group">
-        <div class="filter-label">Date Range</div>
+        <div class="filter-label">Date</div>
         <div class="date-inputs">
           <div class="date-field">
             <input type="date" id="dateFrom">
@@ -339,21 +339,24 @@
           <div class="pill" id="qThisMonth">This Month</div>
         </div>
       </div>
+      <div class="filter-divider"></div>
       <div class="filter-group">
         <div class="filter-label">Medium</div>
         <div class="pill-row" id="mediumPills"></div>
       </div>
+      <div class="filter-divider"></div>
       <div class="filter-group">
         <div class="filter-label">Call Status</div>
         <div class="pill-row" id="callStatusPills"></div>
       </div>
+      <div class="filter-divider"></div>
       <div class="filter-group">
         <div class="filter-label">BD</div>
         <div class="pill-row" id="bdPills"></div>
       </div>
       <div class="filter-spacer"></div>
       <div class="result-count" id="resultCount"></div>
-      <button class="reset-btn" id="resetBtn">✕ Reset filters</button>
+      <button class="reset-btn" id="resetBtn">✕ Reset</button>
     </div>
 
     <div class="funnel" id="kpiStrip"></div>
