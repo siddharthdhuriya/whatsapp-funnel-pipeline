@@ -241,6 +241,19 @@ function addDaysIso(iso, delta){
   return dt.toISOString().slice(0,10);
 }
 
+// Weeks run Monday–Sunday, identified by their Monday's ISO date.
+function weekStartIso(iso){
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m-1, d));
+  const day = dt.getUTCDay(); // 0=Sun..6=Sat
+  const diffFromMonday = day===0 ? 6 : day-1;
+  dt.setUTCDate(dt.getUTCDate()-diffFromMonday);
+  return dt.toISOString().slice(0,10);
+}
+function weekLabel(weekStart){
+  return `${formatDMY(weekStart)} – ${formatDMY(addDaysIso(weekStart,6))}`;
+}
+
 function setupStaticListeners(){
   if (staticListenersBound) return;
   staticListenersBound = true;
@@ -268,17 +281,18 @@ function setupStaticListeners(){
     render();
   });
 
-  const tabBtnDayWise = document.getElementById('tabBtnDayWise');
-  const tabBtnChannel = document.getElementById('tabBtnChannel');
-  const dayWiseTab = document.getElementById('dayWiseTab');
-  const channelTab = document.getElementById('channelTab');
-  tabBtnDayWise.addEventListener('click', ()=>{
-    tabBtnDayWise.classList.add('active'); tabBtnChannel.classList.remove('active');
-    dayWiseTab.classList.remove('hidden'); channelTab.classList.add('hidden');
-  });
-  tabBtnChannel.addEventListener('click', ()=>{
-    tabBtnChannel.classList.add('active'); tabBtnDayWise.classList.remove('active');
-    channelTab.classList.remove('hidden'); dayWiseTab.classList.add('hidden');
+  const tabs = [
+    { btn: document.getElementById('tabBtnDayWise'), panel: document.getElementById('dayWiseTab') },
+    { btn: document.getElementById('tabBtnChannel'), panel: document.getElementById('channelTab') },
+    { btn: document.getElementById('tabBtnTrends'), panel: document.getElementById('trendsTab') },
+  ];
+  tabs.forEach(({ btn, panel }) => {
+    btn.addEventListener('click', () => {
+      tabs.forEach(t=>{
+        t.btn.classList.toggle('active', t.btn===btn);
+        t.panel.classList.toggle('hidden', t.panel!==panel);
+      });
+    });
   });
 
   document.querySelectorAll('th.sortable').forEach(th=>{
@@ -415,6 +429,7 @@ function render(){
   tbody.innerHTML = html;
 
   renderDayWise(filtered, tot);
+  renderTrends(filtered);
 }
 
 function renderDayWise(filtered, tot){
@@ -474,6 +489,179 @@ function renderDayWise(filtered, tot){
   }).join('');
 
   document.getElementById('dayWiseTableBody').innerHTML = html;
+}
+
+// Percentage-point movement in Converted % / Enriched % at or above this
+// is treated as a deviation worth flagging (rather than normal noise).
+const DEVIATION_THRESHOLD_PTS = 2;
+// Ignore channel/BD combinations too small to compare meaningfully.
+const MOVERS_MIN_VOLUME = 20;
+
+function deltaCell(delta, threshold){
+  if(delta===null || delta===undefined) return `<span class="trend-flat">–</span>`;
+  const sign = delta>0 ? '+' : '';
+  const arrow = delta>0 ? '▲' : delta<0 ? '▼' : '';
+  const isDeviation = Math.abs(delta) >= threshold;
+  const cls = !isDeviation ? 'trend-flat' : (delta>0 ? 'trend-up' : 'trend-down');
+  const devCls = isDeviation ? (delta>0 ? ' dev-cell dev-up' : ' dev-cell dev-down') : '';
+  return `<span class="${cls}${devCls}">${arrow} ${sign}${delta.toFixed(1)}pts</span>`;
+}
+
+function wowCard(label, cur, prev, formatter){
+  let delta = '';
+  if(typeof prev === 'number' && prev>0){
+    const diff = cur - prev;
+    const pctChange = (diff/prev)*100;
+    const cls = pctChange>0 ? 'trend-up' : pctChange<0 ? 'trend-down' : 'trend-flat';
+    const arrow = pctChange>0 ? '▲' : pctChange<0 ? '▼' : '';
+    delta = `<div class="wc-delta ${cls}">${arrow} ${pctChange>0?'+':''}${pctChange.toFixed(1)}% vs last wk</div>`;
+  }
+  return `<div class="wow-card"><div class="wc-label">${label}</div><div class="wc-val">${formatter(cur)}</div>${delta}</div>`;
+}
+
+function wowPctCard(label, cur, prev){
+  const curTxt = cur>=0 ? cur.toFixed(1)+'%' : '–';
+  let delta = '';
+  if(typeof prev === 'number' && prev>=0 && cur>=0){
+    const diff = cur - prev;
+    const isDeviation = Math.abs(diff) >= DEVIATION_THRESHOLD_PTS;
+    const cls = !isDeviation ? 'trend-flat' : (diff>0 ? 'trend-up' : 'trend-down');
+    const arrow = diff>0 ? '▲' : diff<0 ? '▼' : '';
+    delta = `<div class="wc-delta ${cls}">${arrow} ${diff>0?'+':''}${diff.toFixed(1)}pts vs last wk</div>`;
+  }
+  return `<div class="wow-card"><div class="wc-label">${label}</div><div class="wc-val">${curTxt}</div>${delta}</div>`;
+}
+
+function renderTrends(filtered){
+  // 1. Bucket into Monday-Sunday weeks and aggregate.
+  const byWeek = {};
+  filtered.forEach(r=>{
+    const wk = weekStartIso(r.date);
+    if(!byWeek[wk]) byWeek[wk] = {week:wk, total:0, sent:0, delivered:0, converted:0, enriched:0, approved:0};
+    const w = byWeek[wk];
+    w.total+=r.total; w.sent+=r.sent; w.delivered+=r.delivered;
+    w.converted+=r.converted; w.enriched+=r.enriched; w.approved+=r.approved;
+  });
+  const weeks = Object.values(byWeek).sort((a,b)=>a.week.localeCompare(b.week));
+  weeks.forEach(w=>{
+    w.convPct = pctVal(w.converted, w.delivered);
+    w.enrichPct = pctVal(w.enriched, w.total);
+  });
+
+  document.getElementById('trendsWeekCount').textContent = weeks.length + ' week' + (weeks.length===1?'':'s');
+
+  // 2. Weekly trend table, most recent week first — each row's Δ columns
+  // compare it to the chronologically-preceding week.
+  const weeklyBody = document.getElementById('weeklyTrendTableBody');
+  const weeksDesc = [...weeks].reverse();
+  weeklyBody.innerHTML = weeksDesc.map(w=>{
+    const idx = weeks.indexOf(w);
+    const prev = idx>0 ? weeks[idx-1] : null;
+    const deltaConv = prev && prev.convPct>=0 && w.convPct>=0 ? w.convPct-prev.convPct : null;
+    const deltaEnrich = prev && prev.enrichPct>=0 && w.enrichPct>=0 ? w.enrichPct-prev.enrichPct : null;
+    return `
+    <tr>
+      <td>${weekLabel(w.week)}</td>
+      <td>${fmt(w.sent)}</td>
+      <td>${fmt(w.delivered)}</td>
+      <td class="pct">${pct(w.delivered,w.sent)}</td>
+      <td>${fmt(w.converted)}</td>
+      <td class="pct">${pct(w.converted,w.delivered)}</td>
+      <td>${deltaCell(deltaConv, DEVIATION_THRESHOLD_PTS)}</td>
+      <td>${fmt(w.enriched)}</td>
+      <td class="pct">${pct(w.enriched,w.total)}</td>
+      <td>${deltaCell(deltaEnrich, DEVIATION_THRESHOLD_PTS)}</td>
+      <td>${fmt(w.approved)}</td>
+      <td class="pct">${pct(w.approved,w.total)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="12" style="text-align:center; color:var(--text-faint);">No data in range</td></tr>`;
+
+  // 3. This-week-vs-last-week summary cards.
+  const thisWeek = weeks.length ? weeks[weeks.length-1] : null;
+  const lastWeek = weeks.length>1 ? weeks[weeks.length-2] : null;
+
+  document.getElementById('trendsWeekRange').textContent = thisWeek ? weekLabel(thisWeek.week) : '–';
+
+  const wowStrip = document.getElementById('wowStrip');
+  wowStrip.innerHTML = !thisWeek ? '' : [
+    wowCard('Sent', thisWeek.sent, lastWeek && lastWeek.sent, fmt),
+    wowCard('Delivered', thisWeek.delivered, lastWeek && lastWeek.delivered, fmt),
+    wowCard('Converted', thisWeek.converted, lastWeek && lastWeek.converted, fmt),
+    wowPctCard('Converted %', thisWeek.convPct, lastWeek ? lastWeek.convPct : null),
+    wowCard('Enriched', thisWeek.enriched, lastWeek && lastWeek.enriched, fmt),
+    wowPctCard('Enriched %', thisWeek.enrichPct, lastWeek ? lastWeek.enrichPct : null),
+    wowCard('Approved', thisWeek.approved, lastWeek && lastWeek.approved, fmt),
+  ].join('');
+
+  // 4. Channel x BD movers — which specific combinations drove the
+  // Converted %/Enriched % deviation between this week and last week.
+  const moversNote = document.getElementById('moversNote');
+  const moversBody = document.getElementById('moversTableBody');
+
+  if(!thisWeek || !lastWeek){
+    moversNote.textContent = 'Need at least two weeks of data in the current filter to compare movers.';
+    moversBody.innerHTML = '';
+    return;
+  }
+
+  const thisMap = {}, lastMap = {};
+  filtered.forEach(r=>{
+    const wk = weekStartIso(r.date);
+    const target = wk===thisWeek.week ? thisMap : wk===lastWeek.week ? lastMap : null;
+    if(!target) return;
+    const key = r['Channel Id']+'|'+r.BD;
+    if(!target[key]) target[key] = {channel:r['Channel Id'], bd:r.BD, total:0, delivered:0, converted:0, enriched:0};
+    const t = target[key];
+    t.total+=r.total; t.delivered+=r.delivered; t.converted+=r.converted; t.enriched+=r.enriched;
+  });
+
+  const keys = new Set([...Object.keys(thisMap), ...Object.keys(lastMap)]);
+  let movers = [];
+  keys.forEach(key=>{
+    const t = thisMap[key];
+    const l = lastMap[key];
+    const volume = (t?t.delivered:0) + (l?l.delivered:0);
+    if(volume < MOVERS_MIN_VOLUME) return; // too small a sample to compare meaningfully
+
+    const convThis = t ? pctVal(t.converted, t.delivered) : -1;
+    const convLast = l ? pctVal(l.converted, l.delivered) : -1;
+    const enrichThis = t ? pctVal(t.enriched, t.total) : -1;
+    const enrichLast = l ? pctVal(l.enriched, l.total) : -1;
+    const deltaConv = (convThis>=0 && convLast>=0) ? convThis-convLast : null;
+    const deltaEnrich = (enrichThis>=0 && enrichLast>=0) ? enrichThis-enrichLast : null;
+
+    if(!((deltaConv!==null && Math.abs(deltaConv)>=DEVIATION_THRESHOLD_PTS) ||
+         (deltaEnrich!==null && Math.abs(deltaEnrich)>=DEVIATION_THRESHOLD_PTS))) return;
+
+    movers.push({
+      channel: t?t.channel:l.channel, bd: t?t.bd:l.bd,
+      deliveredThis: t?t.delivered:0,
+      convThis, convLast, deltaConv,
+      enrichThis, enrichLast, deltaEnrich,
+      maxAbsDelta: Math.max(Math.abs(deltaConv ?? 0), Math.abs(deltaEnrich ?? 0)),
+    });
+  });
+
+  movers.sort((a,b)=> b.maxAbsDelta - a.maxAbsDelta);
+  const topMovers = movers.slice(0, 20);
+
+  moversNote.textContent = movers.length
+    ? `${movers.length} channel/BD combination(s) moved ${DEVIATION_THRESHOLD_PTS}+ points on Converted % or Enriched % vs last week (min ${MOVERS_MIN_VOLUME} combined delivered messages). Showing top ${topMovers.length} by largest movement.`
+    : `No channel/BD combination moved ${DEVIATION_THRESHOLD_PTS}+ points on Converted % or Enriched % vs last week (min ${MOVERS_MIN_VOLUME} combined delivered messages).`;
+
+  moversBody.innerHTML = topMovers.map(m=>`
+    <tr>
+      <td>${channelName(m.channel)}</td>
+      <td>${m.bd}</td>
+      <td>${fmt(m.deliveredThis)}</td>
+      <td class="pct">${m.convLast>=0 ? m.convLast.toFixed(1)+'%' : '–'}</td>
+      <td class="pct">${m.convThis>=0 ? m.convThis.toFixed(1)+'%' : '–'}</td>
+      <td>${deltaCell(m.deltaConv, DEVIATION_THRESHOLD_PTS)}</td>
+      <td class="pct">${m.enrichLast>=0 ? m.enrichLast.toFixed(1)+'%' : '–'}</td>
+      <td class="pct">${m.enrichThis>=0 ? m.enrichThis.toFixed(1)+'%' : '–'}</td>
+      <td>${deltaCell(m.deltaEnrich, DEVIATION_THRESHOLD_PTS)}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="9" style="text-align:center; color:var(--text-faint);">No significant movers</td></tr>`;
 }
 
 async function loadAndRender(){

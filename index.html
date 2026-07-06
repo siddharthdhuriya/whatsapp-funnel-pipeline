@@ -221,7 +221,7 @@
   tbody tr.overall-row td{border-bottom:1px solid var(--teal); color:var(--teal);}
   .pct{color:var(--text-dim); font-size:11px;}
   .pct.low{color:var(--red); font-weight:700; background:var(--red-dim); border-radius:5px; padding:2px 6px;}
-  .table-scroll{max-height:520px; overflow-y:auto; margin:0 -18px; padding:0 18px;}
+  .table-scroll{max-height:520px; overflow-y:auto; overflow-x:auto; margin:0 -18px; padding:0 18px;}
   th.sortable{cursor:pointer;}
   th.sortable:hover{color:var(--teal);}
   th .arrow{font-size:9px; margin-left:2px; opacity:.6;}
@@ -235,6 +235,27 @@
   }
   .tab-btn:hover{border-color:var(--teal); color:var(--text);}
   .tab-btn.active{background:var(--teal-dim); border-color:var(--teal); color:var(--teal); font-weight:600;}
+
+  /* TRENDS TAB */
+  .trend-up{color:var(--teal); font-weight:700;}
+  .trend-down{color:var(--red); font-weight:700;}
+  .trend-flat{color:var(--text-faint);}
+  .dev-cell{border-radius:5px; padding:2px 6px;}
+  .dev-cell.dev-up{background:var(--teal-dim);}
+  .dev-cell.dev-down{background:var(--red-dim);}
+  .trend-subhead{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--text-faint); margin:18px 0 8px;
+  }
+  .trend-note{font-size:11.5px; color:var(--text-faint); margin-bottom:10px; line-height:1.5;}
+  .wow-strip{display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:10px; margin-bottom:6px;}
+  .wow-card{
+    background:var(--surface-alt); border:1px solid var(--border-soft); border-radius:8px;
+    padding:10px 12px;
+  }
+  .wow-card .wc-label{font-family:var(--font-mono); font-size:9.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.06em;}
+  .wow-card .wc-val{font-family:var(--font-mono); font-size:17px; font-weight:600; color:var(--text); margin-top:4px;}
+  .wow-card .wc-delta{font-family:var(--font-mono); font-size:11px; margin-top:3px;}
 
   /* Funnel bars viz */
   .stagebar{margin-bottom:18px;}
@@ -341,6 +362,7 @@
         <div class="tabs-row">
           <div class="tab-btn active" id="tabBtnDayWise" data-tab="daywise">Day Wise</div>
           <div class="tab-btn" id="tabBtnChannel" data-tab="channel">Channel Breakdown</div>
+          <div class="tab-btn" id="tabBtnTrends" data-tab="trends">Trends</div>
         </div>
 
         <div id="dayWiseTab">
@@ -389,6 +411,57 @@
                 </tr>
               </thead>
               <tbody id="channelTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="trendsTab" class="hidden">
+          <h2 style="margin-bottom:3px;">Trends <span class="tag" id="trendsWeekRange">–</span></h2>
+          <div class="desc">Week-on-week movement for the current filter selection. Weeks run Monday–Sunday. Converted % and Enriched % deviations of 2+ points are highlighted.</div>
+
+          <div class="wow-strip" id="wowStrip"></div>
+
+          <div class="trend-subhead">Weekly Trend <span id="trendsWeekCount"></span></div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Week</th>
+                  <th>Sent</th>
+                  <th>Delivered</th>
+                  <th>Delivered %</th>
+                  <th>Converted</th>
+                  <th>Converted %</th>
+                  <th>Δ Conv pts</th>
+                  <th>Enriched</th>
+                  <th>Enriched %</th>
+                  <th>Δ Enrich pts</th>
+                  <th>Approved</th>
+                  <th>Approved %</th>
+                </tr>
+              </thead>
+              <tbody id="weeklyTrendTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="trend-subhead">Channel &times; BD Movers — This Week vs Last Week</div>
+          <div class="trend-note" id="moversNote"></div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Channel</th>
+                  <th>BD</th>
+                  <th>Delivered (this wk)</th>
+                  <th>Converted % (last)</th>
+                  <th>Converted % (this)</th>
+                  <th>Δ Conv pts</th>
+                  <th>Enriched % (last)</th>
+                  <th>Enriched % (this)</th>
+                  <th>Δ Enrich pts</th>
+                </tr>
+              </thead>
+              <tbody id="moversTableBody"></tbody>
             </table>
           </div>
         </div>
