@@ -272,6 +272,14 @@ function setupStaticListeners(){
     const yesterday = addDaysIso(todayIso(), -1);
     dateFromEl.value = yesterday; dateToEl.value = yesterday; updateDateLabels(); render();
   });
+  document.getElementById('qThisMonth').addEventListener('click', ()=>{
+    const today = todayIso();
+    const [y,m] = today.split('-');
+    const monthStart = `${y}-${m}-01`;
+    // "Current month till current date minus 1" — i.e. up to yesterday,
+    // not including today's (likely still-incomplete) data.
+    dateFromEl.value = monthStart; dateToEl.value = addDaysIso(today, -1); updateDateLabels(); render();
+  });
 
   document.getElementById('resetBtn').addEventListener('click', ()=>{
     state.Medium.clear(); state['Call Status'].clear(); state.BD.clear();
