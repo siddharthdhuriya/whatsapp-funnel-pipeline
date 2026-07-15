@@ -265,8 +265,10 @@ function setupStaticListeners(){
     dateFromEl.value = minDate; dateToEl.value = maxDate; updateDateLabels(); render();
   });
   document.getElementById('qLast7').addEventListener('click', ()=>{
-    const today = todayIso();
-    dateFromEl.value = addDaysIso(today, -6); dateToEl.value = today; updateDateLabels(); render();
+    // Excludes today — a 7-day window ending yesterday, since today's data
+    // is likely still incomplete.
+    const yesterday = addDaysIso(todayIso(), -1);
+    dateFromEl.value = addDaysIso(yesterday, -6); dateToEl.value = yesterday; updateDateLabels(); render();
   });
   document.getElementById('qYesterday').addEventListener('click', ()=>{
     const yesterday = addDaysIso(todayIso(), -1);
