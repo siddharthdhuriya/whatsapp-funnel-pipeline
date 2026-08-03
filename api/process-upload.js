@@ -82,6 +82,7 @@ async function processFile(path) {
   // cells as their numeric serial, so toDateOnly() can parse both explicitly.
   const workbook = XLSX.read(arrayBuffer, { type: 'buffer', raw: true, cellDates: false });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  clipToPopulatedHeaderColumns(sheet);
   const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });
 
   // 2. Aggregate — mirrors the same GROUP BY the dashboard uses:
@@ -92,7 +93,12 @@ async function processFile(path) {
     const dateCreated = row['Date Created'];
     if (!dateCreated) continue; // skip malformed rows rather than crash the whole run
 
-    const reportDate = toDateOnly(dateCreated);
+    let reportDate;
+    try {
+      reportDate = toDateOnly(dateCreated);
+    } catch {
+      continue; // unparseable value (e.g. data shifted into the wrong column) — skip rather than crash the whole run
+    }
     const medium = String(row['Medium'] ?? '-');
     const callStatus = String(row['Call Status'] ?? '-');
     const bd = Number(row['BD'] ?? -1);
@@ -140,6 +146,28 @@ async function processFile(path) {
   }
 
   return { rowsParsed: rows.length, segmentsUpserted: segmentRows.length };
+}
+
+// Exports occasionally carry a stray far-out cell (leftover formatting,
+// an accidental paste) that makes SheetJS report a used range thousands
+// of columns wide even though only ~40-50 columns hold real data. Since
+// sheet_to_json's cost scales with rows x columns of the declared range,
+// an inflated range turns a sub-second parse into a 40s+ one — long
+// enough to blow past the function's execution timeout, which kills the
+// process before it ever reaches the code that logs success or failure.
+// Clipping to the last populated header cell keeps the parse proportional
+// to the sheet's actual size.
+function clipToPopulatedHeaderColumns(sheet) {
+  if (!sheet['!ref']) return;
+  const range = XLSX.utils.decode_range(sheet['!ref']);
+  let lastCol = range.s.c;
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c })];
+    if (cell && cell.v !== undefined && cell.v !== null && String(cell.v).trim() !== '') {
+      lastCol = c;
+    }
+  }
+  sheet['!ref'] = XLSX.utils.encode_range({ s: range.s, e: { r: range.e.r, c: lastCol } });
 }
 
 function toDateOnly(value) {
