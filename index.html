@@ -366,6 +366,7 @@
         <div class="tabs-row">
           <div class="tab-btn active" id="tabBtnDayWise" data-tab="daywise">Day Wise</div>
           <div class="tab-btn" id="tabBtnChannel" data-tab="channel">Channel Breakdown</div>
+          <div class="tab-btn" id="tabBtnCategory" data-tab="category">Category Breakdown</div>
           <div class="tab-btn" id="tabBtnTrends" data-tab="trends">Trends</div>
         </div>
 
@@ -415,6 +416,27 @@
                 </tr>
               </thead>
               <tbody id="channelTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="categoryTab" class="hidden">
+          <h2 style="margin-bottom:3px;">Category Breakdown <span class="tag" id="categoryCount">–</span></h2>
+          <div class="desc">Sent, delivered and converted counts per Search Keyword for the current date range. Overall totals pinned on top. Converted % below 10% is flagged in red. Not affected by the Medium/Call Status/BD filters above, since search keyword isn't tracked at that granularity.</div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Search Keyword</th>
+                  <th>Leads</th>
+                  <th>Sent</th>
+                  <th>Delivered</th>
+                  <th>Delivered %</th>
+                  <th>Converted</th>
+                  <th>Converted %</th>
+                </tr>
+              </thead>
+              <tbody id="categoryTableBody"></tbody>
             </table>
           </div>
         </div>

@@ -87,7 +87,11 @@ async function processFile(path) {
 
   // 2. Aggregate — mirrors the same GROUP BY the dashboard uses:
   //    date x Medium x Call Status x BD x Channel Id.
+  // Also aggregated a second, independent way by date x Search Keyword,
+  // for the Category Breakdown tab — kept separate from `segments` above
+  // rather than folding search_keyword into that key (see schema.sql for why).
   const segments = new Map();
+  const categories = new Map();
 
   for (const row of rows) {
     const dateCreated = row['Date Created'];
@@ -103,6 +107,7 @@ async function processFile(path) {
     const callStatus = String(row['Call Status'] ?? '-');
     const bd = Number(row['BD'] ?? -1);
     const channelId = Number(row['Channel Id'] ?? -1);
+    const searchKeyword = String(row['Search Keyword'] ?? '-');
 
     const key = [reportDate, medium, callStatus, bd, channelId].join('|');
     if (!segments.has(key)) {
@@ -117,20 +122,33 @@ async function processFile(path) {
     }
     const seg = segments.get(key);
 
+    const catKey = [reportDate, searchKeyword].join('|');
+    if (!categories.has(catKey)) {
+      categories.set(catKey, {
+        report_date: reportDate,
+        search_keyword: searchKeyword,
+        total: 0, sent: 0, delivered: 0, converted: 0, enriched: 0, approved: 0,
+      });
+    }
+    const cat = categories.get(catKey);
+
     const firstAns = row['1st Ans Date'];
     const secondAns = row['2nd Ans Date'];
     const thirdAns = row['3rd Ans Date'];
     const hasDate = (v) => v !== null && v !== undefined && v !== '-' && v !== '';
 
-    seg.total += 1;
-    if (row['WhatsApp Sent'] === 'Yes') seg.sent += 1;
-    if (row['WhatsApp Delivered'] === 'Yes') seg.delivered += 1;
-    if (row['Converted on WhatsApp'] === 'Yes') seg.converted += 1;
-    if (hasDate(firstAns)) seg.enriched += 1;
-    if (hasDate(firstAns) && hasDate(secondAns) && hasDate(thirdAns)) seg.approved += 1;
+    for (const seg2 of [seg, cat]) {
+      seg2.total += 1;
+      if (row['WhatsApp Sent'] === 'Yes') seg2.sent += 1;
+      if (row['WhatsApp Delivered'] === 'Yes') seg2.delivered += 1;
+      if (row['Converted on WhatsApp'] === 'Yes') seg2.converted += 1;
+      if (hasDate(firstAns)) seg2.enriched += 1;
+      if (hasDate(firstAns) && hasDate(secondAns) && hasDate(thirdAns)) seg2.approved += 1;
+    }
   }
 
   const segmentRows = Array.from(segments.values());
+  const categoryRows = Array.from(categories.values());
 
   // 3. Upsert. The unique constraint on
   //    (report_date, medium, call_status, bd, channel_id) means
@@ -143,6 +161,15 @@ async function processFile(path) {
         onConflict: 'report_date,medium,call_status,bd,channel_id',
       });
     if (upsertError) throw new Error(`Upsert failed: ${upsertError.message}`);
+  }
+
+  if (categoryRows.length > 0) {
+    const { error: categoryUpsertError } = await supabase
+      .from('whatsapp_funnel_by_category')
+      .upsert(categoryRows, {
+        onConflict: 'report_date,search_keyword',
+      });
+    if (categoryUpsertError) throw new Error(`Category upsert failed: ${categoryUpsertError.message}`);
   }
 
   return { rowsParsed: rows.length, segmentsUpserted: segmentRows.length };

@@ -40,6 +40,38 @@ create policy "authenticated users can view funnel summary"
   to authenticated
   using (true);
 
+-- 1b. Category (Search Keyword) breakdown — aggregated independently of
+--     the main summary table above, by report_date x search_keyword only.
+--     Kept separate rather than folding search_keyword into
+--     whatsapp_funnel_summary's grouping key, since doing that would
+--     require reprocessing every historical upload to avoid
+--     double-counting already-processed dates.
+create table if not exists whatsapp_funnel_by_category (
+  id              bigint generated always as identity primary key,
+  report_date     date        not null,
+  search_keyword  text        not null,
+  total           integer     not null default 0,
+  sent            integer     not null default 0,
+  delivered       integer     not null default 0,
+  converted       integer     not null default 0,
+  enriched        integer     not null default 0,
+  approved        integer     not null default 0,
+  updated_at      timestamptz not null default now(),
+
+  constraint whatsapp_funnel_by_category_unique_segment
+    unique (report_date, search_keyword)
+);
+
+create index if not exists idx_whatsapp_funnel_by_category_date
+  on whatsapp_funnel_by_category (report_date);
+
+alter table whatsapp_funnel_by_category enable row level security;
+
+create policy "authenticated users can view category breakdown"
+  on whatsapp_funnel_by_category for select
+  to authenticated
+  using (true);
+
 -- 2. Observability — every processing run gets logged here so a
 --    silent failure is never actually silent. Check this table (or
 --    build a tiny status widget) to see when the pipeline last ran.

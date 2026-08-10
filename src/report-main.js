@@ -115,9 +115,36 @@ async function fetchAllSegments() {
   }));
 }
 
+async function fetchAllCategories() {
+  const pageSize = 1000;
+  let from = 0;
+  let all = [];
+  while (true) {
+    const { data, error } = await supabase
+      .from('whatsapp_funnel_by_category')
+      .select('*')
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    all = all.concat(data);
+    if (!data.length || data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all.map(r => ({
+    date: r.report_date,
+    searchKeyword: r.search_keyword,
+    total: r.total,
+    sent: r.sent,
+    delivered: r.delivered,
+    converted: r.converted,
+    enriched: r.enriched,
+    approved: r.approved,
+  }));
+}
+
 // ---- Dashboard state (ported from the original static dashboard) ----
 
 let RAW = [];
+let RAW_CATEGORY = [];
 let minDate, maxDate, allDates;
 let sortKey = 'total', sortDir = -1;
 let staticListenersBound = false;
@@ -294,6 +321,7 @@ function setupStaticListeners(){
   const tabs = [
     { btn: document.getElementById('tabBtnDayWise'), panel: document.getElementById('dayWiseTab') },
     { btn: document.getElementById('tabBtnChannel'), panel: document.getElementById('channelTab') },
+    { btn: document.getElementById('tabBtnCategory'), panel: document.getElementById('categoryTab') },
     { btn: document.getElementById('tabBtnTrends'), panel: document.getElementById('trendsTab') },
   ];
   tabs.forEach(({ btn, panel }) => {
@@ -439,7 +467,60 @@ function render(){
   tbody.innerHTML = html;
 
   renderDayWise(filtered, tot);
+  renderCategoryBreakdown();
   renderTrends(filtered);
+}
+
+// Category Breakdown is fetched from its own table (report_date x Search
+// Keyword only — see schema.sql), so it respects the date range filter
+// but not the Medium / Call Status / BD pills, which aren't tracked at
+// this granularity.
+function renderCategoryBreakdown(){
+  const inRange = RAW_CATEGORY.filter(r => r.date >= dateFromEl.value && r.date <= dateToEl.value);
+
+  const byCategory = {};
+  inRange.forEach(r=>{
+    const key = r.searchKeyword;
+    if(!byCategory[key]) byCategory[key] = {searchKeyword:key,total:0,sent:0,delivered:0,converted:0,enriched:0,approved:0};
+    const c = byCategory[key];
+    c.total+=r.total; c.sent+=r.sent; c.delivered+=r.delivered;
+    c.converted+=r.converted; c.enriched+=r.enriched; c.approved+=r.approved;
+  });
+  const rows = Object.values(byCategory).sort((a,b)=> b.total-a.total);
+
+  document.getElementById('categoryCount').textContent = rows.length + ' categor' + (rows.length===1?'y':'ies');
+
+  const tot = inRange.reduce((acc,r)=>{
+    acc.total+=r.total; acc.sent+=r.sent; acc.delivered+=r.delivered; acc.converted+=r.converted;
+    return acc;
+  }, {total:0,sent:0,delivered:0,converted:0});
+  const overallConvPct = pctVal(tot.converted, tot.delivered);
+
+  let html = `<tr class="overall-row">
+    <td>OVERALL</td>
+    <td>${fmt(tot.total)}</td>
+    <td>${fmt(tot.sent)}</td>
+    <td>${fmt(tot.delivered)}</td>
+    <td class="pct">${pct(tot.delivered,tot.sent)}</td>
+    <td>${fmt(tot.converted)}</td>
+    <td class="pct${overallConvPct>=0 && overallConvPct<10 ? ' low':''}">${pct(tot.converted,tot.delivered)}</td>
+  </tr>`;
+  html += rows.map(r=>{
+    const convPct = pctVal(r.converted, r.delivered);
+    const isLow = convPct>=0 && convPct<10;
+    return `
+    <tr>
+      <td>${r.searchKeyword}</td>
+      <td>${fmt(r.total)}</td>
+      <td>${fmt(r.sent)}</td>
+      <td>${fmt(r.delivered)}</td>
+      <td class="pct">${pct(r.delivered,r.sent)}</td>
+      <td>${fmt(r.converted)}</td>
+      <td class="pct${isLow ? ' low':''}">${pct(r.converted,r.delivered)}</td>
+    </tr>
+  `;
+  }).join('');
+  document.getElementById('categoryTableBody').innerHTML = html;
 }
 
 function renderDayWise(filtered, tot){
@@ -675,7 +756,7 @@ function renderTrends(filtered){
 }
 
 async function loadAndRender(){
-  RAW = await fetchAllSegments();
+  [RAW, RAW_CATEGORY] = await Promise.all([fetchAllSegments(), fetchAllCategories()]);
   setupDateBoundsAndFilters();
   setupStaticListeners();
   render();
