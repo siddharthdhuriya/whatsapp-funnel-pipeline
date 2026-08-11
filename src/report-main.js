@@ -155,6 +155,7 @@ let RAW = [];
 let RAW_CATEGORY = [];
 let minDate, maxDate, allDates;
 let sortKey = 'total', sortDir = -1;
+let categorySortKey = 'total', categorySortDir = -1;
 let staticListenersBound = false;
 
 const CHANNEL_NAMES = {
@@ -344,9 +345,15 @@ function setupStaticListeners(){
   document.querySelectorAll('th.sortable').forEach(th=>{
     th.addEventListener('click', ()=>{
       const key = th.dataset.key;
-      if(sortKey===key){ sortDir *= -1; } else { sortKey = key; sortDir = -1; }
-      document.querySelectorAll('th.sortable .arrow').forEach(a=>a.textContent='');
-      th.querySelector('.arrow').textContent = sortDir===1 ? '▴' : '▾';
+      const isCategory = th.dataset.group === 'category';
+      if(isCategory){
+        if(categorySortKey===key){ categorySortDir *= -1; } else { categorySortKey = key; categorySortDir = -1; }
+      } else {
+        if(sortKey===key){ sortDir *= -1; } else { sortKey = key; sortDir = -1; }
+      }
+      const groupSelector = isCategory ? 'th.sortable[data-group="category"] .arrow' : 'th.sortable:not([data-group="category"]) .arrow';
+      document.querySelectorAll(groupSelector).forEach(a=>a.textContent='');
+      th.querySelector('.arrow').textContent = (isCategory ? categorySortDir : sortDir)===1 ? '▴' : '▾';
       render();
     });
   });
@@ -494,7 +501,13 @@ function renderCategoryBreakdown(){
     c.total+=r.total; c.sent+=r.sent; c.delivered+=r.delivered;
     c.converted+=r.converted; c.enriched+=r.enriched; c.approved+=r.approved;
   });
-  const rows = Object.values(byCategory).sort((a,b)=> b.total-a.total);
+  const rows = Object.values(byCategory);
+  rows.forEach(r=> r.convPct = r.delivered>0 ? (r.converted/r.delivered)*100 : -1 );
+  rows.sort((a,b)=> {
+    const av = a[categorySortKey], bv = b[categorySortKey];
+    const cmp = typeof av === 'string' ? av.localeCompare(bv) : (av-bv);
+    return cmp*categorySortDir || a.searchKeyword.localeCompare(b.searchKeyword);
+  });
 
   document.getElementById('categoryCount').textContent = rows.length + ' categor' + (rows.length===1?'y':'ies');
 

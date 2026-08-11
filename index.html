@@ -405,14 +405,14 @@
             <table>
               <thead>
                 <tr>
-                  <th class="sortable" data-key="channel">Channel <span class="arrow">▾</span></th>
-                  <th class="sortable" data-key="bd">BD <span class="arrow"></span></th>
-                  <th class="sortable" data-key="total">Leads <span class="arrow"></span></th>
-                  <th class="sortable" data-key="sent">Sent <span class="arrow"></span></th>
-                  <th class="sortable" data-key="delivered">Delivered <span class="arrow"></span></th>
+                  <th class="sortable" data-group="channel" data-key="channel">Channel <span class="arrow">▾</span></th>
+                  <th class="sortable" data-group="channel" data-key="bd">BD <span class="arrow"></span></th>
+                  <th class="sortable" data-group="channel" data-key="total">Leads <span class="arrow"></span></th>
+                  <th class="sortable" data-group="channel" data-key="sent">Sent <span class="arrow"></span></th>
+                  <th class="sortable" data-group="channel" data-key="delivered">Delivered <span class="arrow"></span></th>
                   <th>Delivered %</th>
-                  <th class="sortable" data-key="converted">Converted <span class="arrow"></span></th>
-                  <th class="sortable" data-key="convPct">Converted % <span class="arrow"></span></th>
+                  <th class="sortable" data-group="channel" data-key="converted">Converted <span class="arrow"></span></th>
+                  <th class="sortable" data-group="channel" data-key="convPct">Converted % <span class="arrow"></span></th>
                 </tr>
               </thead>
               <tbody id="channelTableBody"></tbody>
@@ -427,13 +427,13 @@
             <table>
               <thead>
                 <tr>
-                  <th>Search Keyword</th>
-                  <th>Leads</th>
-                  <th>Sent</th>
-                  <th>Delivered</th>
+                  <th class="sortable" data-group="category" data-key="searchKeyword">Search Keyword <span class="arrow"></span></th>
+                  <th class="sortable" data-group="category" data-key="total">Leads <span class="arrow">▾</span></th>
+                  <th class="sortable" data-group="category" data-key="sent">Sent <span class="arrow"></span></th>
+                  <th class="sortable" data-group="category" data-key="delivered">Delivered <span class="arrow"></span></th>
                   <th>Delivered %</th>
-                  <th>Converted</th>
-                  <th>Converted %</th>
+                  <th class="sortable" data-group="category" data-key="converted">Converted <span class="arrow"></span></th>
+                  <th class="sortable" data-group="category" data-key="convPct">Converted % <span class="arrow"></span></th>
                 </tr>
               </thead>
               <tbody id="categoryTableBody"></tbody>
