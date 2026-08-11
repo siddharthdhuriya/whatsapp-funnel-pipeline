@@ -72,6 +72,43 @@ create policy "authenticated users can view category breakdown"
   to authenticated
   using (true);
 
+-- The dashboard's Category Breakdown tab only ever needs totals grouped
+-- by search_keyword for the selected date range — it never needs the
+-- individual report_date x search_keyword rows. With this table having
+-- grown to 200k+ rows (high-cardinality search keywords x many days),
+-- pulling every row to the browser just to sum it in JS was the reason
+-- that tab was so much slower than the rest of the dashboard. Doing the
+-- SUM/GROUP BY in Postgres instead means only one row per distinct
+-- keyword ever crosses the network. Runs as SECURITY INVOKER (the
+-- default) so the caller's own RLS policy above still applies.
+create or replace function whatsapp_category_breakdown(date_from date, date_to date)
+returns table (
+  search_keyword text,
+  total     bigint,
+  sent      bigint,
+  delivered bigint,
+  converted bigint,
+  enriched  bigint,
+  approved  bigint
+)
+language sql
+stable
+as $$
+  select
+    search_keyword,
+    sum(total)::bigint,
+    sum(sent)::bigint,
+    sum(delivered)::bigint,
+    sum(converted)::bigint,
+    sum(enriched)::bigint,
+    sum(approved)::bigint
+  from whatsapp_funnel_by_category
+  where report_date between date_from and date_to
+  group by search_keyword;
+$$;
+
+grant execute on function whatsapp_category_breakdown(date, date) to authenticated;
+
 -- 2. Observability — every processing run gets logged here so a
 --    silent failure is never actually silent. Check this table (or
 --    build a tiny status widget) to see when the pipeline last ran.

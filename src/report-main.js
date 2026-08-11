@@ -90,13 +90,11 @@ init();
 // round trips on large tables), it first asks Postgres for the row count
 // then fires every page request in parallel, a batch of `concurrency` at
 // a time.
-async function fetchAllPaginated(table) {
+async function fetchAllPaginated(queryFactory) {
   const pageSize = 1000;
   const concurrency = 8;
 
-  const { count, error: countError } = await supabase
-    .from(table)
-    .select('*', { count: 'exact', head: true });
+  const { count, error: countError } = await queryFactory({ count: 'exact', head: true });
   if (countError) throw countError;
 
   const pageStarts = [];
@@ -107,7 +105,7 @@ async function fetchAllPaginated(table) {
   for (let i = 0; i < pageStarts.length; i += concurrency) {
     const batch = pageStarts.slice(i, i + concurrency);
     const results = await Promise.all(batch.map(from =>
-      supabase.from(table).select('*').range(from, from + pageSize - 1)
+      queryFactory().range(from, from + pageSize - 1)
     ));
     results.forEach((r, j) => {
       if (r.error) throw r.error;
@@ -118,7 +116,9 @@ async function fetchAllPaginated(table) {
 }
 
 async function fetchAllSegments() {
-  const all = await fetchAllPaginated('whatsapp_funnel_summary');
+  const all = await fetchAllPaginated(opts =>
+    supabase.from('whatsapp_funnel_summary').select('*', opts)
+  );
   // Map DB column names onto the field names the render logic below expects.
   return all.map(r => ({
     date: r.report_date,
@@ -135,10 +135,18 @@ async function fetchAllSegments() {
   }));
 }
 
-async function fetchAllCategories() {
-  const all = await fetchAllPaginated('whatsapp_funnel_by_category');
-  return all.map(r => ({
-    date: r.report_date,
+// whatsapp_funnel_by_category has grown to 200k+ rows (report_date x
+// search_keyword, and search_keyword is high-cardinality), so unlike
+// fetchAllSegments this does NOT pull every row to the client -- it asks
+// Postgres to sum by search_keyword for the given date range and only
+// ships back one row per distinct keyword. See whatsapp_category_breakdown
+// in sql/schema.sql.
+async function fetchCategoryBreakdown(dateFrom, dateTo) {
+  const params = { date_from: dateFrom, date_to: dateTo };
+  const data = await fetchAllPaginated(opts =>
+    supabase.rpc('whatsapp_category_breakdown', params, opts)
+  );
+  return data.map(r => ({
     searchKeyword: r.search_keyword,
     total: r.total,
     sent: r.sent,
@@ -155,7 +163,7 @@ let RAW = [];
 let RAW_CATEGORY = [];
 let minDate, maxDate, allDates;
 let sortKey = 'total', sortDir = -1;
-let categorySortKey = 'total', categorySortDir = -1;
+let categorySortKey = 'sent', categorySortDir = -1;
 let staticListenersBound = false;
 
 const CHANNEL_NAMES = {
@@ -294,21 +302,21 @@ function setupStaticListeners(){
   if (staticListenersBound) return;
   staticListenersBound = true;
 
-  dateFromEl.addEventListener('change', ()=>{ updateDateLabels(); render(); });
-  dateToEl.addEventListener('change', ()=>{ updateDateLabels(); render(); });
+  dateFromEl.addEventListener('change', ()=>{ updateDateLabels(); onDateRangeChanged(); });
+  dateToEl.addEventListener('change', ()=>{ updateDateLabels(); onDateRangeChanged(); });
 
   document.getElementById('qAll').addEventListener('click', ()=>{
-    dateFromEl.value = minDate; dateToEl.value = maxDate; updateDateLabels(); render();
+    dateFromEl.value = minDate; dateToEl.value = maxDate; updateDateLabels(); onDateRangeChanged();
   });
   document.getElementById('qLast7').addEventListener('click', ()=>{
     // Excludes today — a 7-day window ending yesterday, since today's data
     // is likely still incomplete.
     const yesterday = addDaysIso(todayIso(), -1);
-    dateFromEl.value = addDaysIso(yesterday, -6); dateToEl.value = yesterday; updateDateLabels(); render();
+    dateFromEl.value = addDaysIso(yesterday, -6); dateToEl.value = yesterday; updateDateLabels(); onDateRangeChanged();
   });
   document.getElementById('qYesterday').addEventListener('click', ()=>{
     const yesterday = addDaysIso(todayIso(), -1);
-    dateFromEl.value = yesterday; dateToEl.value = yesterday; updateDateLabels(); render();
+    dateFromEl.value = yesterday; dateToEl.value = yesterday; updateDateLabels(); onDateRangeChanged();
   });
   document.getElementById('qThisMonth').addEventListener('click', ()=>{
     const today = todayIso();
@@ -316,7 +324,7 @@ function setupStaticListeners(){
     const monthStart = `${y}-${m}-01`;
     // "Current month till current date minus 1" — i.e. up to yesterday,
     // not including today's (likely still-incomplete) data.
-    dateFromEl.value = monthStart; dateToEl.value = addDaysIso(today, -1); updateDateLabels(); render();
+    dateFromEl.value = monthStart; dateToEl.value = addDaysIso(today, -1); updateDateLabels(); onDateRangeChanged();
   });
 
   document.getElementById('resetBtn').addEventListener('click', ()=>{
@@ -324,7 +332,7 @@ function setupStaticListeners(){
     dateFromEl.value = minDate; dateToEl.value = maxDate;
     updateDateLabels();
     updatePillStyles();
-    render();
+    onDateRangeChanged();
   });
 
   const tabs = [
@@ -486,22 +494,14 @@ function render(){
   renderTrends(filtered);
 }
 
-// Category Breakdown is fetched from its own table (report_date x Search
-// Keyword only — see schema.sql), so it respects the date range filter
-// but not the Medium / Call Status / BD pills, which aren't tracked at
-// this granularity.
+// Category Breakdown is fetched pre-aggregated (grouped by search_keyword
+// in Postgres, see whatsapp_category_breakdown in sql/schema.sql) for the
+// current date range -- it respects the date range filter but not the
+// Medium / Call Status / BD pills, which aren't tracked at this
+// granularity. RAW_CATEGORY already has one row per keyword, so no
+// client-side grouping is needed here.
 function renderCategoryBreakdown(){
-  const inRange = RAW_CATEGORY.filter(r => r.date >= dateFromEl.value && r.date <= dateToEl.value);
-
-  const byCategory = {};
-  inRange.forEach(r=>{
-    const key = r.searchKeyword;
-    if(!byCategory[key]) byCategory[key] = {searchKeyword:key,total:0,sent:0,delivered:0,converted:0,enriched:0,approved:0};
-    const c = byCategory[key];
-    c.total+=r.total; c.sent+=r.sent; c.delivered+=r.delivered;
-    c.converted+=r.converted; c.enriched+=r.enriched; c.approved+=r.approved;
-  });
-  const rows = Object.values(byCategory);
+  const rows = RAW_CATEGORY.map(r => ({ ...r }));
   rows.forEach(r=> r.convPct = r.delivered>0 ? (r.converted/r.delivered)*100 : -1 );
   rows.sort((a,b)=> {
     const av = a[categorySortKey], bv = b[categorySortKey];
@@ -511,7 +511,7 @@ function renderCategoryBreakdown(){
 
   document.getElementById('categoryCount').textContent = rows.length + ' categor' + (rows.length===1?'y':'ies');
 
-  const tot = inRange.reduce((acc,r)=>{
+  const tot = RAW_CATEGORY.reduce((acc,r)=>{
     acc.total+=r.total; acc.sent+=r.sent; acc.delivered+=r.delivered; acc.converted+=r.converted;
     return acc;
   }, {total:0,sent:0,delivered:0,converted:0});
@@ -776,9 +776,15 @@ function renderTrends(filtered){
   `).join('') || `<tr><td colspan="9" style="text-align:center; color:var(--text-faint);">No significant movers</td></tr>`;
 }
 
+async function onDateRangeChanged(){
+  RAW_CATEGORY = await fetchCategoryBreakdown(dateFromEl.value, dateToEl.value);
+  render();
+}
+
 async function loadAndRender(){
-  [RAW, RAW_CATEGORY] = await Promise.all([fetchAllSegments(), fetchAllCategories()]);
+  RAW = await fetchAllSegments();
   setupDateBoundsAndFilters();
+  RAW_CATEGORY = await fetchCategoryBreakdown(dateFromEl.value, dateToEl.value);
   setupStaticListeners();
   render();
 }
