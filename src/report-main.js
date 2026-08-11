@@ -85,20 +85,40 @@ init();
 
 // ---- Data loading ----
 
-async function fetchAllSegments() {
+// Pages through a table's full contents. Rather than awaiting each page
+// before requesting the next (which turns into hundreds of sequential
+// round trips on large tables), it first asks Postgres for the row count
+// then fires every page request in parallel, a batch of `concurrency` at
+// a time.
+async function fetchAllPaginated(table) {
   const pageSize = 1000;
-  let from = 0;
-  let all = [];
-  while (true) {
-    const { data, error } = await supabase
-      .from('whatsapp_funnel_summary')
-      .select('*')
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    all = all.concat(data);
-    if (!data.length || data.length < pageSize) break;
-    from += pageSize;
+  const concurrency = 8;
+
+  const { count, error: countError } = await supabase
+    .from(table)
+    .select('*', { count: 'exact', head: true });
+  if (countError) throw countError;
+
+  const pageStarts = [];
+  for (let from = 0; from < (count || 0); from += pageSize) pageStarts.push(from);
+  if (!pageStarts.length) return [];
+
+  const pages = new Array(pageStarts.length);
+  for (let i = 0; i < pageStarts.length; i += concurrency) {
+    const batch = pageStarts.slice(i, i + concurrency);
+    const results = await Promise.all(batch.map(from =>
+      supabase.from(table).select('*').range(from, from + pageSize - 1)
+    ));
+    results.forEach((r, j) => {
+      if (r.error) throw r.error;
+      pages[i + j] = r.data;
+    });
   }
+  return pages.flat();
+}
+
+async function fetchAllSegments() {
+  const all = await fetchAllPaginated('whatsapp_funnel_summary');
   // Map DB column names onto the field names the render logic below expects.
   return all.map(r => ({
     date: r.report_date,
@@ -116,19 +136,7 @@ async function fetchAllSegments() {
 }
 
 async function fetchAllCategories() {
-  const pageSize = 1000;
-  let from = 0;
-  let all = [];
-  while (true) {
-    const { data, error } = await supabase
-      .from('whatsapp_funnel_by_category')
-      .select('*')
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    all = all.concat(data);
-    if (!data.length || data.length < pageSize) break;
-    from += pageSize;
-  }
+  const all = await fetchAllPaginated('whatsapp_funnel_by_category');
   return all.map(r => ({
     date: r.report_date,
     searchKeyword: r.search_keyword,
