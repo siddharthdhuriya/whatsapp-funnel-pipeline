@@ -1,4 +1,4 @@
-// src/report-main.js
+﻿// src/report-main.js
 //
 // Drives index.html — the WhatsApp Funnel Control Room report.
 // Gated behind a single shared password (not a per-user login) — the
@@ -285,6 +285,13 @@ function addDaysIso(iso, delta){
   return dt.toISOString().slice(0,10);
 }
 
+const DATE_QUICK_PILL_IDS = ['qAll','qLast15','qLast7','qYesterday','qThisMonth'];
+function setActiveDateQuickPill(activeId){
+  DATE_QUICK_PILL_IDS.forEach(id=>{
+    document.getElementById(id).classList.toggle('active', id===activeId);
+  });
+}
+
 // Weeks run Monday–Sunday, identified by their Monday's ISO date.
 function weekStartIso(iso){
   const [y,m,d] = iso.split('-').map(Number);
@@ -307,16 +314,26 @@ function setupStaticListeners(){
 
   document.getElementById('qAll').addEventListener('click', ()=>{
     dateFromEl.value = minDate; dateToEl.value = maxDate; updateDateLabels(); onDateRangeChanged();
+    setActiveDateQuickPill('qAll');
+  });
+  document.getElementById('qLast15').addEventListener('click', ()=>{
+    // Excludes today — a 15-day window ending yesterday, since today's data
+    // is likely still incomplete.
+    const yesterday = addDaysIso(todayIso(), -1);
+    dateFromEl.value = addDaysIso(yesterday, -14); dateToEl.value = yesterday; updateDateLabels(); onDateRangeChanged();
+    setActiveDateQuickPill('qLast15');
   });
   document.getElementById('qLast7').addEventListener('click', ()=>{
     // Excludes today — a 7-day window ending yesterday, since today's data
     // is likely still incomplete.
     const yesterday = addDaysIso(todayIso(), -1);
     dateFromEl.value = addDaysIso(yesterday, -6); dateToEl.value = yesterday; updateDateLabels(); onDateRangeChanged();
+    setActiveDateQuickPill('qLast7');
   });
   document.getElementById('qYesterday').addEventListener('click', ()=>{
     const yesterday = addDaysIso(todayIso(), -1);
     dateFromEl.value = yesterday; dateToEl.value = yesterday; updateDateLabels(); onDateRangeChanged();
+    setActiveDateQuickPill('qYesterday');
   });
   document.getElementById('qThisMonth').addEventListener('click', ()=>{
     const today = todayIso();
@@ -325,13 +342,16 @@ function setupStaticListeners(){
     // "Current month till current date minus 1" — i.e. up to yesterday,
     // not including today's (likely still-incomplete) data.
     dateFromEl.value = monthStart; dateToEl.value = addDaysIso(today, -1); updateDateLabels(); onDateRangeChanged();
+    setActiveDateQuickPill('qThisMonth');
   });
 
   document.getElementById('resetBtn').addEventListener('click', ()=>{
     state.Medium.clear(); state['Call Status'].clear(); state.BD.clear();
-    dateFromEl.value = minDate; dateToEl.value = maxDate;
+    const yesterday = addDaysIso(todayIso(), -1);
+    dateFromEl.value = addDaysIso(yesterday, -14); dateToEl.value = yesterday;
     updateDateLabels();
     updatePillStyles();
+    setActiveDateQuickPill('qLast15');
     onDateRangeChanged();
   });
 
@@ -373,8 +393,12 @@ function setupDateBoundsAndFilters(){
 
   dateFromEl.min = minDate; dateFromEl.max = maxDate;
   dateToEl.min = minDate; dateToEl.max = maxDate;
-  dateFromEl.value = minDate; dateToEl.value = maxDate;
+  // Default to the last 15 days (ending yesterday) rather than the full
+  // range, so the report opens on a manageable, recent slice of data.
+  const defaultYesterday = addDaysIso(todayIso(), -1);
+  dateFromEl.value = addDaysIso(defaultYesterday, -14); dateToEl.value = defaultYesterday;
   updateDateLabels();
+  setActiveDateQuickPill('qLast15');
 
   const mediums = uniqueSorted('Medium');
   const callStatuses = uniqueSorted('Call Status');
