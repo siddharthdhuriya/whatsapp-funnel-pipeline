@@ -1,4 +1,4 @@
-﻿// src/report-main.js
+// src/report-main.js
 //
 // Drives index.html — the WhatsApp Funnel Control Room report.
 // Gated behind a single shared password (not a per-user login) — the
@@ -489,7 +489,6 @@ function render(){
   let html = `<tr class="overall-row">
     <td>OVERALL</td>
     <td>–</td>
-    <td>${fmt(tot.total)}</td>
     <td>${fmt(tot.sent)}</td>
     <td>${fmt(tot.delivered)}</td>
     <td class="pct">${pct(tot.delivered,tot.sent)}</td>
@@ -502,7 +501,6 @@ function render(){
     <tr>
       <td>${channelName(r.channel)}</td>
       <td>${r.bd}</td>
-      <td>${fmt(r.total)}</td>
       <td>${fmt(r.sent)}</td>
       <td>${fmt(r.delivered)}</td>
       <td class="pct">${pct(r.delivered,r.sent)}</td>
@@ -543,7 +541,6 @@ function renderCategoryBreakdown(){
 
   let html = `<tr class="overall-row">
     <td>OVERALL</td>
-    <td>${fmt(tot.total)}</td>
     <td>${fmt(tot.sent)}</td>
     <td>${fmt(tot.delivered)}</td>
     <td class="pct">${pct(tot.delivered,tot.sent)}</td>
@@ -556,7 +553,6 @@ function renderCategoryBreakdown(){
     return `
     <tr>
       <td>${r.searchKeyword}</td>
-      <td>${fmt(r.total)}</td>
       <td>${fmt(r.sent)}</td>
       <td>${fmt(r.delivered)}</td>
       <td class="pct">${pct(r.delivered,r.sent)}</td>
