@@ -305,6 +305,13 @@ function weekLabel(weekStart){
   return `${formatDMY(weekStart)} – ${formatDMY(addDaysIso(weekStart,6))}`;
 }
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function monthKeyIso(iso){ return iso.slice(0,7); } // YYYY-MM
+function monthLabel(monthKey){
+  const parts = monthKey.split("-").map(Number);
+  return MONTH_NAMES[parts[1]-1] + " " + parts[0];
+}
+
 function setupStaticListeners(){
   if (staticListenersBound) return;
   staticListenersBound = true;
@@ -357,6 +364,8 @@ function setupStaticListeners(){
 
   const tabs = [
     { btn: document.getElementById('tabBtnDayWise'), panel: document.getElementById('dayWiseTab') },
+    { btn: document.getElementById('tabBtnWeekly'), panel: document.getElementById('weeklyTab') },
+    { btn: document.getElementById('tabBtnMonthly'), panel: document.getElementById('monthlyTab') },
     { btn: document.getElementById('tabBtnChannel'), panel: document.getElementById('channelTab') },
     { btn: document.getElementById('tabBtnCategory'), panel: document.getElementById('categoryTab') },
     { btn: document.getElementById('tabBtnTrends'), panel: document.getElementById('trendsTab') },
@@ -514,6 +523,8 @@ function render(){
   renderDayWise(filtered, tot);
   renderCategoryBreakdown();
   renderTrends(filtered);
+  renderWeeklyAll();
+  renderMonthlyAll();
 }
 
 // Category Breakdown is fetched pre-aggregated (grouped by search_keyword
@@ -621,6 +632,84 @@ function renderDayWise(filtered, tot){
   }).join('');
 
   document.getElementById('dayWiseTableBody').innerHTML = html;
+}
+
+// Weekly / Monthly tabs aggregate across the FULL dataset (RAW), ignoring
+// the date range and Medium/Call Status/BD pill filters entirely — these
+// tabs are meant to show a complete, filter-independent rollup.
+function costCells(delivered, converted, enriched){
+  const totalCost = delivered * COST_PER_DELIVERED_PAISE / 100;
+  const perConv = converted>0 ? totalCost/converted : null;
+  const perEnrich = enriched>0 ? totalCost/enriched : null;
+  return `<td>${rupee(totalCost,2)}</td><td>${rupee(perConv,2)}</td><td>${rupee(perEnrich,2)}</td>`;
+}
+
+function renderPeriodTable(groups, tot, tbodyId, countElId, unitLabel, labelFn){
+  const overallConvPct = pctVal(tot.converted, tot.delivered);
+  let html = `<tr class="overall-row">
+    <td>OVERALL</td>
+    <td>${fmt(tot.sent)}</td>
+    <td>${fmt(tot.delivered)}</td>
+    <td class="pct">${pct(tot.delivered,tot.sent)}</td>
+    <td>${fmt(tot.converted)}</td>
+    <td class="pct${overallConvPct>=0 && overallConvPct<10 ? ' low':''}">${pct(tot.converted,tot.delivered)}</td>
+    <td>${fmt(tot.enriched)}</td>
+    <td class="pct">${pct(tot.enriched,tot.delivered)}</td>
+    <td>${fmt(tot.approved)}</td>
+    <td class="pct">${pct(tot.approved,tot.delivered)}</td>
+    ${costCells(tot.delivered, tot.converted, tot.enriched)}
+  </tr>`;
+
+  html += groups.map(g=>{
+    const convPct = pctVal(g.converted, g.delivered);
+    const isLow = convPct>=0 && convPct<10;
+    return `
+    <tr>
+      <td>${labelFn(g.key)}</td>
+      <td>${fmt(g.sent)}</td>
+      <td>${fmt(g.delivered)}</td>
+      <td class="pct">${pct(g.delivered,g.sent)}</td>
+      <td>${fmt(g.converted)}</td>
+      <td class="pct${isLow ? ' low':''}">${pct(g.converted,g.delivered)}</td>
+      <td>${fmt(g.enriched)}</td>
+      <td class="pct">${pct(g.enriched,g.delivered)}</td>
+      <td>${fmt(g.approved)}</td>
+      <td class="pct">${pct(g.approved,g.delivered)}</td>
+      ${costCells(g.delivered, g.converted, g.enriched)}
+    </tr>
+  `;
+  }).join('');
+
+  document.getElementById(tbodyId).innerHTML = html;
+  document.getElementById(countElId).textContent = groups.length + ' ' + unitLabel + (groups.length===1?'':'s');
+}
+
+function groupAllBy(keyFn){
+  const byKey = {};
+  const tot = {total:0,sent:0,delivered:0,converted:0,enriched:0,approved:0};
+  RAW.forEach(r=>{
+    const key = keyFn(r.date);
+    if(!byKey[key]) byKey[key] = {key,total:0,sent:0,delivered:0,converted:0,enriched:0,approved:0};
+    const g = byKey[key];
+    g.total+=r.total; g.sent+=r.sent; g.delivered+=r.delivered;
+    g.converted+=r.converted; g.enriched+=r.enriched; g.approved+=r.approved;
+    tot.total+=r.total; tot.sent+=r.sent; tot.delivered+=r.delivered;
+    tot.converted+=r.converted; tot.enriched+=r.enriched; tot.approved+=r.approved;
+  });
+  const groups = Object.values(byKey).sort((a,b)=> b.key.localeCompare(a.key));
+  return {groups, tot};
+}
+
+// Weekly / Monthly tabs show ALL data regardless of the filter bar above —
+// they intentionally read from RAW, not the filtered rows passed into render().
+function renderWeeklyAll(){
+  const {groups, tot} = groupAllBy(weekStartIso);
+  renderPeriodTable(groups, tot, 'weeklyAllTableBody', 'weeklyCount', 'week', weekLabel);
+}
+
+function renderMonthlyAll(){
+  const {groups, tot} = groupAllBy(monthKeyIso);
+  renderPeriodTable(groups, tot, 'monthlyAllTableBody', 'monthlyCount', 'month', monthLabel);
 }
 
 // Percentage-point movement in Converted % / Enriched % at or above this

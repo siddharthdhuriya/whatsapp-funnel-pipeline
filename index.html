@@ -365,14 +365,16 @@
     <div class="maingrid">
       <div class="panel">
         <div class="tabs-row">
-          <div class="tab-btn active" id="tabBtnDayWise" data-tab="daywise">Day Wise</div>
+          <div class="tab-btn active" id="tabBtnDayWise" data-tab="daywise">Daily</div>
+          <div class="tab-btn" id="tabBtnWeekly" data-tab="weekly">Weekly</div>
+          <div class="tab-btn" id="tabBtnMonthly" data-tab="monthly">Monthly</div>
           <div class="tab-btn" id="tabBtnChannel" data-tab="channel">Channel Breakdown</div>
           <div class="tab-btn" id="tabBtnCategory" data-tab="category">Category Breakdown</div>
           <div class="tab-btn" id="tabBtnTrends" data-tab="trends">Trends</div>
         </div>
 
         <div id="dayWiseTab">
-          <h2 style="margin-bottom:3px;">Day Wise <span class="tag" id="dayWiseCount">–</span></h2>
+          <h2 style="margin-bottom:3px;">Daily <span class="tag" id="dayWiseCount">–</span></h2>
           <div class="desc">Daily totals for the current filter selection, most recent day first. Cost figures use the same ₹0.107/delivered-message rate as the summary cards above.</div>
           <div class="table-scroll">
             <table>
@@ -395,6 +397,60 @@
                 </tr>
               </thead>
               <tbody id="dayWiseTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="weeklyTab" class="hidden">
+          <h2 style="margin-bottom:3px;">Weekly <span class="tag" id="weeklyCount">–</span></h2>
+          <div class="desc">Week-wise totals across all data (Monday–Sunday), most recent week first. Not affected by the date range or Medium/Call Status/BD filters above. Cost figures use the same ₹0.107/delivered-message rate as the summary cards above.</div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Week</th>
+                  <th>Sent</th>
+                  <th>Delivered</th>
+                  <th>Delivered %</th>
+                  <th>Converted</th>
+                  <th>Converted %</th>
+                  <th>Enriched</th>
+                  <th>Enriched %</th>
+                  <th>Approved</th>
+                  <th>Approved %</th>
+                  <th>Total Cost</th>
+                  <th>Cost / Converted</th>
+                  <th>Cost / Enriched</th>
+                </tr>
+              </thead>
+              <tbody id="weeklyAllTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="monthlyTab" class="hidden">
+          <h2 style="margin-bottom:3px;">Monthly <span class="tag" id="monthlyCount">–</span></h2>
+          <div class="desc">Month-wise totals across all data, most recent month first. Not affected by the date range or Medium/Call Status/BD filters above. Cost figures use the same ₹0.107/delivered-message rate as the summary cards above.</div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Sent</th>
+                  <th>Delivered</th>
+                  <th>Delivered %</th>
+                  <th>Converted</th>
+                  <th>Converted %</th>
+                  <th>Enriched</th>
+                  <th>Enriched %</th>
+                  <th>Approved</th>
+                  <th>Approved %</th>
+                  <th>Total Cost</th>
+                  <th>Cost / Converted</th>
+                  <th>Cost / Enriched</th>
+                </tr>
+              </thead>
+              <tbody id="monthlyAllTableBody"></tbody>
             </table>
           </div>
         </div>
