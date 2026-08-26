@@ -324,10 +324,11 @@ function setupStaticListeners(){
     setActiveDateQuickPill('qAll');
   });
   document.getElementById('qLast15').addEventListener('click', ()=>{
-    // Excludes today — a 15-day window ending yesterday, since today's data
-    // is likely still incomplete.
-    const yesterday = addDaysIso(todayIso(), -1);
-    dateFromEl.value = addDaysIso(yesterday, -14); dateToEl.value = yesterday; updateDateLabels(); onDateRangeChanged();
+    // Anchored to the latest date with uploaded data (maxDate), not real
+    // "yesterday" — if today's (or yesterday's) export hasn't been
+    // uploaded yet, the window ends at the most recent available day
+    // instead of showing a trailing gap.
+    dateFromEl.value = addDaysIso(maxDate, -14); dateToEl.value = maxDate; updateDateLabels(); onDateRangeChanged();
     setActiveDateQuickPill('qLast15');
   });
   document.getElementById('qLast7').addEventListener('click', ()=>{
@@ -354,8 +355,7 @@ function setupStaticListeners(){
 
   document.getElementById('resetBtn').addEventListener('click', ()=>{
     state.Medium.clear(); state['Call Status'].clear(); state.BD.clear();
-    const yesterday = addDaysIso(todayIso(), -1);
-    dateFromEl.value = addDaysIso(yesterday, -14); dateToEl.value = yesterday;
+    dateFromEl.value = addDaysIso(maxDate, -14); dateToEl.value = maxDate;
     updateDateLabels();
     updatePillStyles();
     setActiveDateQuickPill('qLast15');
@@ -402,10 +402,10 @@ function setupDateBoundsAndFilters(){
 
   dateFromEl.min = minDate; dateFromEl.max = maxDate;
   dateToEl.min = minDate; dateToEl.max = maxDate;
-  // Default to the last 15 days (ending yesterday) rather than the full
-  // range, so the report opens on a manageable, recent slice of data.
-  const defaultYesterday = addDaysIso(todayIso(), -1);
-  dateFromEl.value = addDaysIso(defaultYesterday, -14); dateToEl.value = defaultYesterday;
+  // Default to the last 15 days ending at the latest date with uploaded
+  // data (maxDate), not real "yesterday" — so the report opens on a
+  // complete recent window even if today's export isn't in yet.
+  dateFromEl.value = addDaysIso(maxDate, -14); dateToEl.value = maxDate;
   updateDateLabels();
   setActiveDateQuickPill('qLast15');
 
