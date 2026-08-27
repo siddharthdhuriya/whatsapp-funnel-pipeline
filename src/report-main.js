@@ -256,7 +256,7 @@ function renderDayWiseNoteBadges(){
     const date = btn.dataset.date;
     const count = (NOTES_BY_DATE[date] || []).length;
     btn.classList.toggle('has-note', count > 0);
-    btn.textContent = count > 0 ? `📝 ${count}` : '+ note';
+    btn.textContent = count > 0 ? `📝 ${count}` : '+📋';
   });
 }
 
@@ -727,7 +727,7 @@ function renderDayWise(filtered, tot){
     const convPct = pctVal(d.converted, d.delivered);
     const isLow = convPct>=0 && convPct<10;
     const noteCount = (NOTES_BY_DATE[d.date] || []).length;
-    const noteCell = `<button type="button" class="note-badge${noteCount>0?' has-note':''}" data-date="${d.date}">${noteCount>0 ? `📝 ${noteCount}` : '+ note'}</button>`;
+    const noteCell = `<button type="button" class="note-badge${noteCount>0?' has-note':''}" data-date="${d.date}">${noteCount>0 ? `📝 ${noteCount}` : '+📋'}</button>`;
     return `
     <tr>
       <td>${formatDMY(d.date)}</td>
