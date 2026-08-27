@@ -233,6 +233,7 @@ noteForm.addEventListener('submit', async (e) => {
   noteInput.value = '';
   renderNoteList(currentNoteDate);
   renderDayWiseNoteBadges();
+  renderNotesTab();
 });
 
 noteListEl.addEventListener('click', async (e) => {
@@ -244,6 +245,7 @@ noteListEl.addEventListener('click', async (e) => {
   NOTES_BY_DATE = await fetchNotes();
   renderNoteList(currentNoteDate);
   renderDayWiseNoteBadges();
+  renderNotesTab();
 });
 
 // Re-stamps the Notes column's badges in place from NOTES_BY_DATE, without
@@ -472,6 +474,7 @@ function setupStaticListeners(){
     { btn: document.getElementById('tabBtnChannel'), panel: document.getElementById('channelTab') },
     { btn: document.getElementById('tabBtnCategory'), panel: document.getElementById('categoryTab') },
     { btn: document.getElementById('tabBtnTrends'), panel: document.getElementById('trendsTab') },
+    { btn: document.getElementById('tabBtnNotes'), panel: document.getElementById('notesTab') },
   ];
   tabs.forEach(({ btn, panel }) => {
     btn.addEventListener('click', () => {
@@ -633,6 +636,7 @@ function render(){
   renderTrends(filtered);
   renderWeeklyAll();
   renderMonthlyAll();
+  renderNotesTab();
 }
 
 // Category Breakdown is fetched pre-aggregated (grouped by search_keyword
@@ -822,6 +826,38 @@ function renderWeeklyAll(){
 function renderMonthlyAll(){
   const {groups, tot} = groupAllBy(monthKeyIso);
   renderPeriodTable(groups, tot, 'monthlyAllTableBody', 'monthlyCount', 'month', monthLabel);
+}
+
+// Notes tab -- a flat, filter-independent list of every date-wise note,
+// most recent note_date first (fetchNotes already returns them in that
+// order). Note bodies are written via textContent, never templated into
+// the HTML, so free text can't be interpreted as markup.
+function renderNotesTab(){
+  const tbody = document.getElementById('notesTableBody');
+  if(!tbody) return;
+  const dates = Object.keys(NOTES_BY_DATE).sort((a,b)=> b.localeCompare(a));
+  const flat = [];
+  dates.forEach(d=> (NOTES_BY_DATE[d] || []).forEach(n=> flat.push(n)));
+
+  document.getElementById('notesCount').textContent = flat.length + ' note' + (flat.length===1?'':'s');
+
+  if(!flat.length){
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-faint);">No notes yet -- add them from the Notes column of the Daily tab.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = flat.map(n=>`
+    <tr data-id="${n.id}">
+      <td>${formatDMY(n.note_date)}</td>
+      <td>${dayAbbrev(n.note_date)}</td>
+      <td class="note-cell"></td>
+      <td>${new Date(n.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+    </tr>
+  `).join('');
+  flat.forEach(n=>{
+    const el = tbody.querySelector(`tr[data-id="${n.id}"] .note-cell`);
+    if(el) el.textContent = n.body;
+  });
 }
 
 // Percentage-point movement in Converted % / Enriched % at or above this
