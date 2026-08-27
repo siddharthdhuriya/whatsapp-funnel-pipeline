@@ -109,6 +109,38 @@ $$;
 
 grant execute on function whatsapp_category_breakdown(date, date) to authenticated;
 
+-- 1c. Dashboard notes — free-text, date-wise annotations added from the
+--     Daily tab (e.g. "sent count dipped today, WhatsApp API had an
+--     outage"). Multiple notes can exist per date. Shared login means
+--     no per-user ownership is tracked; anyone with dashboard access
+--     can add or delete any note.
+create table if not exists dashboard_notes (
+  id          bigint generated always as identity primary key,
+  note_date   date        not null,
+  body        text        not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists idx_dashboard_notes_date
+  on dashboard_notes (note_date);
+
+alter table dashboard_notes enable row level security;
+
+create policy "authenticated users can view notes"
+  on dashboard_notes for select
+  to authenticated
+  using (true);
+
+create policy "authenticated users can add notes"
+  on dashboard_notes for insert
+  to authenticated
+  with check (true);
+
+create policy "authenticated users can delete notes"
+  on dashboard_notes for delete
+  to authenticated
+  using (true);
+
 -- 2. Observability — every processing run gets logged here so a
 --    silent failure is never actually silent. Check this table (or
 --    build a tiny status widget) to see when the pipeline last ran.

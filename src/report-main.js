@@ -157,10 +157,113 @@ async function fetchCategoryBreakdown(dateFrom, dateTo) {
   }));
 }
 
+// ---- Date-wise notes ----
+
+const noteModalOverlay = document.getElementById('noteModalOverlay');
+const noteModalDate = document.getElementById('noteModalDate');
+const noteListEl = document.getElementById('noteList');
+const noteForm = document.getElementById('noteForm');
+const noteInput = document.getElementById('noteInput');
+const noteModalClose = document.getElementById('noteModalClose');
+
+async function fetchNotes(){
+  const { data, error } = await supabase
+    .from('dashboard_notes')
+    .select('*')
+    .order('note_date', { ascending: false })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const byDate = {};
+  (data || []).forEach(n => {
+    if (!byDate[n.note_date]) byDate[n.note_date] = [];
+    byDate[n.note_date].push(n);
+  });
+  return byDate;
+}
+
+function renderNoteList(date){
+  const notes = NOTES_BY_DATE[date] || [];
+  noteListEl.innerHTML = notes.length
+    ? notes.map(n => `
+      <div class="note-item" data-id="${n.id}">
+        <div class="note-item-body"></div>
+        <div class="note-item-meta">
+          <span class="note-item-time">${new Date(n.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>
+          <button type="button" class="note-item-del" data-id="${n.id}">Delete</button>
+        </div>
+      </div>
+    `).join('')
+    : `<div class="note-empty">No notes for this date yet.</div>`;
+  // Set body text via textContent (not templated into the HTML above) so
+  // note text can never be interpreted as markup.
+  notes.forEach(n => {
+    const el = noteListEl.querySelector(`.note-item[data-id="${n.id}"] .note-item-body`);
+    if (el) el.textContent = n.body;
+  });
+}
+
+function openNoteModal(date){
+  currentNoteDate = date;
+  noteModalDate.textContent = formatDMY(date);
+  renderNoteList(date);
+  noteInput.value = '';
+  noteModalOverlay.classList.remove('hidden');
+  noteInput.focus();
+}
+function closeNoteModal(){
+  noteModalOverlay.classList.add('hidden');
+  currentNoteDate = null;
+}
+noteModalClose.addEventListener('click', closeNoteModal);
+noteModalOverlay.addEventListener('click', (e) => { if (e.target === noteModalOverlay) closeNoteModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !noteModalOverlay.classList.contains('hidden')) closeNoteModal();
+});
+
+noteForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = noteInput.value.trim();
+  if (!body || !currentNoteDate) return;
+  const submitBtn = noteForm.querySelector('button');
+  submitBtn.disabled = true;
+  const { error } = await supabase.from('dashboard_notes').insert({ note_date: currentNoteDate, body });
+  submitBtn.disabled = false;
+  if (error) { alert('Could not save note: ' + error.message); return; }
+  NOTES_BY_DATE = await fetchNotes();
+  noteInput.value = '';
+  renderNoteList(currentNoteDate);
+  renderDayWiseNoteBadges();
+});
+
+noteListEl.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.note-item-del');
+  if (!btn) return;
+  if (!confirm('Delete this note?')) return;
+  const { error } = await supabase.from('dashboard_notes').delete().eq('id', btn.dataset.id);
+  if (error) { alert('Could not delete note: ' + error.message); return; }
+  NOTES_BY_DATE = await fetchNotes();
+  renderNoteList(currentNoteDate);
+  renderDayWiseNoteBadges();
+});
+
+// Re-stamps the Notes column's badges in place from NOTES_BY_DATE, without
+// re-rendering the whole Daily table (which would be redundant — nothing
+// else about the rows changed).
+function renderDayWiseNoteBadges(){
+  document.querySelectorAll('#dayWiseTableBody .note-badge[data-date]').forEach(btn => {
+    const date = btn.dataset.date;
+    const count = (NOTES_BY_DATE[date] || []).length;
+    btn.classList.toggle('has-note', count > 0);
+    btn.textContent = count > 0 ? `📝 ${count}` : '+ note';
+  });
+}
+
 // ---- Dashboard state (ported from the original static dashboard) ----
 
 let RAW = [];
 let RAW_CATEGORY = [];
+let NOTES_BY_DATE = {};
+let currentNoteDate = null;
 let minDate, maxDate, allDates;
 let sortKey = 'total', sortDir = -1;
 let categorySortKey = 'sent', categorySortDir = -1;
@@ -377,6 +480,11 @@ function setupStaticListeners(){
         t.panel.classList.toggle('hidden', t.panel!==panel);
       });
     });
+  });
+
+  document.getElementById('dayWiseTableBody').addEventListener('click', (e) => {
+    const btn = e.target.closest('.note-badge');
+    if (btn) openNoteModal(btn.dataset.date);
   });
 
   document.querySelectorAll('th.sortable').forEach(th=>{
@@ -598,6 +706,7 @@ function renderDayWise(filtered, tot){
   let html = `<tr class="overall-row">
     <td>OVERALL</td>
     <td>–</td>
+    <td>–</td>
     <td>${fmt(tot.sent)}</td>
     <td>${fmt(tot.delivered)}</td>
     <td class="pct">${pct(tot.delivered,tot.sent)}</td>
@@ -613,10 +722,13 @@ function renderDayWise(filtered, tot){
   html += days.map(d=>{
     const convPct = pctVal(d.converted, d.delivered);
     const isLow = convPct>=0 && convPct<10;
+    const noteCount = (NOTES_BY_DATE[d.date] || []).length;
+    const noteCell = `<button type="button" class="note-badge${noteCount>0?' has-note':''}" data-date="${d.date}">${noteCount>0 ? `📝 ${noteCount}` : '+ note'}</button>`;
     return `
     <tr>
       <td>${formatDMY(d.date)}</td>
       <td>${dayAbbrev(d.date)}</td>
+      <td>${noteCell}</td>
       <td>${fmt(d.sent)}</td>
       <td>${fmt(d.delivered)}</td>
       <td class="pct">${pct(d.delivered,d.sent)}</td>
@@ -892,6 +1004,14 @@ async function onDateRangeChanged(){
 
 async function loadAndRender(){
   RAW = await fetchAllSegments();
+  try {
+    NOTES_BY_DATE = await fetchNotes();
+  } catch (err) {
+    // Don't let a missing dashboard_notes table (e.g. the SQL migration in
+    // sql/schema.sql hasn't been run yet) take down the whole dashboard.
+    console.error('Failed to load notes:', err);
+    NOTES_BY_DATE = {};
+  }
   setupDateBoundsAndFilters();
   RAW_CATEGORY = await fetchCategoryBreakdown(dateFromEl.value, dateToEl.value);
   setupStaticListeners();
