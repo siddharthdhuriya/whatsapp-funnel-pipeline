@@ -227,8 +227,10 @@
   th .arrow{font-size:9px; margin-left:2px; opacity:.6;}
 
   /* TABS */
-  .tabs-row{display:flex; gap:8px; margin-bottom:12px;}
+  .tabs-row{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px;}
   .tab-btn{
+    display:inline-flex; align-items:center; gap:6px; flex:0 0 auto;
+    white-space:nowrap; line-height:1;
     font-family:var(--font-mono); font-size:12px; padding:6px 14px;
     border-radius:8px; border:1px solid var(--border); background:#fff;
     color:var(--text-dim); cursor:pointer; transition:all .15s ease;
